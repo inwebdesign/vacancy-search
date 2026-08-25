@@ -1,0 +1,11 @@
+// Faza 1, Korak 1: samo konekcija, bez modela.
+// Modeli (agencies, profiles) dolaze u Koraku 3.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}

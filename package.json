@@ -1,20 +1,13 @@
 {
-  "name": "vacancy-search",
+  "name": "vacancy-search-monorepo",
   "private": true,
-  "version": "0.1.0",
-  "type": "module",
+  "workspaces": [
+    "apps/*"
+  ],
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "lucide-react": "^0.462.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
-  },
-  "devDependencies": {
-    "@vitejs/plugin-react": "^4.3.4",
-    "vite": "^5.4.11"
+    "dev:site": "npm run dev --workspace=apps/site",
+    "dev:admin": "npm run dev --workspace=apps/admin",
+    "build:site": "npm run build --workspace=apps/site",
+    "build:admin": "npm run build --workspace=apps/admin"
   }
 }
