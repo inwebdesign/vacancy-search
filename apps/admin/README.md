@@ -6,6 +6,8 @@ Faza 1, Korak 2: Supabase projekat + konekcija — **urađeno i provereno** (dev
 
 Faza 1, Korak 3: `agencies` i `profiles` šema — **urađeno i provereno** (tabele primenjene na dev bazu, potvrđeno u Supabase Table Editor-u). `agencies.status` je enum (`pending`/`active`/`suspended`), dodato drugom migracijom — vidi ispod.
 
+Faza 1, Korak 4: Auth — **kod urađen, čeka se ručno podešavanje u Supabase/Google Cloud (vidi ispod)**, pa provera end-to-end.
+
 ## Setup
 
 ```bash
@@ -58,12 +60,46 @@ Migracije su napisane i u repo-u — generisane offline (`prisma migrate diff`, 
 
 Napomena o šemi: `profiles.id` ima realnu FK referencu ka `auth.users.id` (Supabase Auth tabela, van Prisma-inog upravljanja) — to je ručno dodato u `migration.sql` jer Prisma po defaultu ne generiše veze ka `auth` šemi (zbog toga `prisma db pull` baca `P4002` grešku — očekivano, provera se radi kroz Table Editor umesto). `profiles.agency_id` je opciono (superadmin/operator ne pripadaju jednoj agenciji).
 
+## Korak 4 — Auth
+
+### Kod (urađeno)
+
+```
+src/middleware.ts                    Osvežava Supabase sesiju na svakom request-u
+src/app/login/                       Email+password forma + dugme za Google OAuth
+src/app/auth/callback/route.ts       Razmenjuje code za sesiju (OAuth i invite/magic-link)
+src/app/auth/set-password/           Prva stanica posle invite mejla — korisnik postavlja lozinku
+src/app/auth/mfa/                    TOTP enrollment (QR kod + potvrda 6-cifrenim kodom)
+src/app/auth/logout/route.ts         Odjava
+```
+
+Nema javne signup forme — jedini način da neko dobije nalog je invite koji šalje superadmin. Za sada se invite šalje ručno kroz Supabase dashboard (Authentication → Users → Invite user) — nije napravljena posebna admin stranica za to u Koraku 4, jer bi bez zaštite ruta (Korak 6) takva stranica bila nezaštićen server-side action sa service_role ovlašćenjima; ta funkcionalnost prirodnije ide uz Korak 6/7 kad postoji role-based pristup.
+
+MFA stranica (`/auth/mfa`) radi enrollment, ali **ništa je trenutno ne primorava** — obavezno MFA za superadmin/operator uloge treba ožičiti kroz `profiles.role` proveru, prirodno mesto je isto middleware koji Korak 6 pravi za `/admin/*` zaštitu (izbegava se duplirana logika).
+
+### Ručni deo — Supabase/Google Cloud (radiš ti, van koda)
+
+1. **Isključi javni signup**: Supabase dashboard → Authentication → Sign In / Providers → Email → isključi "Allow new users to sign up" (naziv opcije zavisi od verzije UI-ja; traži nešto u vezi sa "signups"/"registracijom").
+2. **URL Configuration**: Authentication → URL Configuration → `Site URL` postavi na adresu aplikacije (lokalno `http://localhost:3000`, kasnije Vercel domen); u `Redirect URLs` dodaj `<site-url>/auth/callback`.
+3. **Invite email redirect**: Authentication → Email Templates → "Invite user" — u linku podesi redirect da vodi na `/auth/callback?next=/auth/set-password` (umesto podrazumevanog), da novi korisnik posle klika na invite odmah završi na strani za postavljanje lozinke.
+4. **Google OAuth provider**: Authentication → Providers → Google → uključi, potreban ti je `Client ID` i `Client Secret` iz [Google Cloud Console](https://console.cloud.google.com/apis/credentials) (OAuth 2.0 Client, tip "Web application", authorized redirect URI je URL koji Supabase prikaže na toj istoj stranici — oblika `https://<project-ref>.supabase.co/auth/v1/callback`).
+5. **Rate limiting na login**: Authentication → Rate Limits ima ugrađeno ograničenje po IP-u za sign-in pokušaje — podesi ga. Napomena: brief traži tačno "5 pokušaja/15min po IP+email" (kombinovani ključ) — Supabase-ov ugrađeni limiter radi po IP-u, ne po IP+email kombinaciji, pa ovo pokriva prevenciju grubo, ne tačno po specifikaciji; precizniji limiter (custom, sa perzistentnim brojačem) nije napravljen u Koraku 4 da se ne bi gradila infrastruktura (KV/Redis) koja još nije deo stack-a — ostaje otvoreno za kasnije.
+6. **MFA enforcement politika**: Supabase ima projekt-nivo MFA podešavanja (Authentication → Multi-Factor Authentication) — pogledaj da li tvoja verzija dashboard-a nudi opciju da zahteva MFA za određene korisnike; ako ne, enforcement ostaje na app-level proveri koja se pravi u Koraku 6.
+
+### Provera da radi
+
+1. Pošalji sebi invite kroz Supabase dashboard (svojim mejlom, sa `agency_id = null`, ulogom `superadmin` — profil moraš ručno uneti u `profiles` tabelu pošto UI za to još ne postoji, videti Table Editor).
+2. Klikni link iz mejla → treba da završiš na `/auth/set-password` → postavi lozinku → redirect na `/`.
+3. Odjavi se, probaj login sa email+lozinka na `/login`.
+4. Probaj i "Prijavi se preko Google-a" dugme (posle koraka 4 iznad).
+5. Otvori `/auth/mfa`, skeniraj QR kod i potvrdi da enrollment prolazi.
+
 ## Sledeći koraci (Faza 1)
 
 - [x] Korak 1: repo i projekat (skelet, provereno)
 - [x] Korak 2: Supabase projekat + konekcija (dev projekat, konekcija provereno)
 - [x] Korak 3: `agencies` i `profiles` tabele u Prisma šemi + migracija (primenjeno na dev bazu, potvrđeno)
-- [ ] Korak 4: Auth (email/password + Google, invite-only)
+- [ ] Korak 4: Auth (email/password + Google, invite-only) — kod gotov, čeka se ručno podešavanje i end-to-end provera (vidi gore)
 - [ ] Korak 5: RLS politike
 - [ ] Korak 6: middleware za `/admin/*`
 - [ ] Korak 7: role-based navigacija (skelet)
