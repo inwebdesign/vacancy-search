@@ -32,9 +32,9 @@ prisma/schema.prisma   Prisma šema (prazna — modeli dolaze u Koraku 3)
 Ovo zahteva pristup Supabase nalogu, pa ne može da se automatizuje iz sesije:
 
 1. **Napravi DVA Supabase projekta** — jedan za dev, jedan za prod (Free tier je dovoljan za Fazu 1, videti napomenu o Pro tier-u ispod).
-2. U svakom projektu: **Project Settings → Database → Connection string** (koristi "Connection pooling" URI, ne direktnu konekciju) → to je `DATABASE_URL`.
-3. **Project Settings → API**: `Project URL` → `NEXT_PUBLIC_SUPABASE_URL`, `anon public` ključ → `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `service_role` ključ → `SUPABASE_SERVICE_ROLE_KEY` (**nikad** u client kod, nikad u git — samo u `.env.local` lokalno i u Vercel env varijablama za deploy).
-4. Kopiraj `.env.example` u `.env.local` i popuni sve četiri vrednosti za dev projekat.
+2. U svakom projektu: dugme **Connect** (vrh stranice projekta) → tab **ORM** → izaberi **Prisma** → kopiraj obe ponuđene vrednosti: transaction-mode pooler ide u `DATABASE_URL`, session-mode pooler (za migracije) ide u `DIRECT_URL`.
+3. **Project Settings → Data API**: `Project URL` → `NEXT_PUBLIC_SUPABASE_URL`, `anon public` ključ → `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `service_role` ključ → `SUPABASE_SERVICE_ROLE_KEY` (**nikad** u client kod, nikad u git — samo u `.env.local` lokalno i u Vercel env varijablama za deploy).
+4. Kopiraj `.env.example` u `.env.local` i popuni svih pet vrednosti za dev projekat.
 5. Proveri konekciju: `npx prisma db pull` treba da prođe bez greške (šema je prazna, ali komanda potvrđuje da `DATABASE_URL` radi).
 6. Pre nego što prva prava agencija počne svakodnevno da koristi sistem, nadogradi produkcioni projekat na **Supabase Pro** (Free tier nema backup i pauzira se posle 7 dana neaktivnosti).
 
