@@ -4,6 +4,8 @@ Faza 1, Korak 1: skelet projekta (Next.js App Router + TypeScript + Tailwind + P
 
 Faza 1, Korak 2: Supabase projekat + konekcija — **urađeno i provereno** (dev projekat kreiran, `prisma db pull` uspešno konektuje na bazu).
 
+Faza 1, Korak 3: `agencies` i `profiles` šema — **migracija pripremljena u repo-u, čeka se primena na dev bazu (vidi ispod).**
+
 ## Setup
 
 ```bash
@@ -23,7 +25,8 @@ src/lib/supabase/client.ts   Supabase klijent za Client Component-e (browser)
 src/lib/supabase/server.ts   Supabase klijent za Server Component-e/actions (cookie-based sesija)
 src/lib/supabase/admin.ts    Service-role klijent, isključivo server-side (zaobilazi RLS)
 src/lib/prisma.ts        Prisma klijent (singleton, izbegava previše konekcija u dev-u)
-prisma/schema.prisma   Prisma šema (prazna — modeli dolaze u Koraku 3)
+prisma/schema.prisma   Prisma šema (agencies, profiles — Korak 3)
+prisma/migrations/     Istorija migracija, tracked kroz git
 .env.example       Šablon za environment varijable (NIKAD ne commit-uj .env.local)
 ```
 
@@ -40,11 +43,23 @@ Ovo zahteva pristup Supabase nalogu, pa ne može da se automatizuje iz sesije:
 
 Kod je već spreman da čita ove varijable čim se popune — nema dodatnih izmena potrebnih posle ovog koraka.
 
+## Korak 3 — primena migracije (radiš ti, lokalno)
+
+Migracija (`prisma/migrations/20260828142855_create_agencies_profiles/`) je već napisana i u repo-u — generisana je offline (`prisma migrate diff`, bez potrebe za konekcijom), pa je ova sesija nije mogla sama primeniti na tvoju bazu jer nema tvoje kredencijale. Ti to radiš lokalno:
+
+1. Povuci najnoviji `claude/vacancy-search-dashboard-upgrade-dcps3w` (`git pull`).
+2. Proveri da ti `apps/admin/.env` ima ispravne `DATABASE_URL` i `DIRECT_URL` (iz Koraka 2).
+3. Primeni migraciju: `npx prisma migrate deploy` — ovo primenjuje SQL fajl koji je već u repo-u, bez ponovnog generisanja (deterministički, bez shadow baze).
+4. Proveri: `npx prisma db pull` sada treba da prepozna `agencies` i `profiles` (bez P4001 greške), ili otvori Supabase **Table Editor** i vizuelno potvrdi da tabele postoje.
+5. Regeneriši klijent: `npx prisma generate`.
+
+Napomena o šemi: `profiles.id` ima realnu FK referencu ka `auth.users.id` (Supabase Auth tabela, van Prisma-inog upravljanja) — to je ručno dodato u `migration.sql` jer Prisma po defaultu ne generiše veze ka `auth` šemi. `profiles.agency_id` je opciono (superadmin/operator ne pripadaju jednoj agenciji). `agencies.status` i dalje je slobodan tekst (nije enum) — brief ne definiše dozvoljene vrednosti za taj konkretan slučaj, pa nije proizvoljno pretpostavljeno; to ostaje otvoreno pitanje za kasnije.
+
 ## Sledeći koraci (Faza 1)
 
 - [x] Korak 1: repo i projekat (skelet, provereno)
 - [x] Korak 2: Supabase projekat + konekcija (dev projekat, konekcija provereno)
-- [ ] Korak 3: `agencies` i `profiles` tabele u Prisma šemi + migracija
+- [ ] Korak 3: `agencies` i `profiles` tabele u Prisma šemi + migracija — kod u repo-u, čeka se primena na dev bazu (vidi gore)
 - [ ] Korak 4: Auth (email/password + Google, invite-only)
 - [ ] Korak 5: RLS politike
 - [ ] Korak 6: middleware za `/admin/*`

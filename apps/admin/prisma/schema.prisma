@@ -1,5 +1,5 @@
-// Faza 1, Korak 1: samo konekcija, bez modela.
-// Modeli (agencies, profiles) dolaze u Koraku 3.
+// Faza 1, Korak 3: agencies i profiles (šema iz projektnog brief-a, sekcija 5).
+// Ostale tabele (uploads, offers, clicks, audit_log) dolaze u kasnijim koracima.
 
 generator client {
   provider = "prisma-client-js"
@@ -9,4 +9,40 @@ datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
+}
+
+enum ProfileRole {
+  superadmin
+  operator
+  agency_admin
+  agency_user
+
+  @@map("profile_role")
+}
+
+model Agency {
+  id                   String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  naziv                String
+  pib                  String  @unique
+  kontakt              String
+  cpcCena              Decimal @map("cpc_cena") @db.Decimal(10, 2)
+  mesecniBudzetKlikova Int     @map("mesecni_budzet_klikova")
+  status               String
+
+  profiles Profile[]
+
+  @@map("agencies")
+}
+
+// id nije auto-generisan — mora da se poklapa sa auth.users.id (Supabase Auth),
+// popunjava se u Koraku 4 kad se doda invite-only auth flow.
+model Profile {
+  id        String      @id @db.Uuid
+  agencyId  String?     @map("agency_id") @db.Uuid
+  role      ProfileRole
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  agency Agency? @relation(fields: [agencyId], references: [id], onDelete: SetNull)
+
+  @@map("profiles")
 }
