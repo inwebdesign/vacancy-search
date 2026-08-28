@@ -2,7 +2,7 @@
 
 Faza 1, Korak 1: skelet projekta (Next.js App Router + TypeScript + Tailwind + Prisma, prazna šema) — **urađeno i provereno** (`npm install` i build prolaze bez grešaka).
 
-Faza 1, Korak 2: Supabase projekat + konekcija — **priprema u kodu urađena, čeka se ručni deo (kreiranje projekta) van repo-a.**
+Faza 1, Korak 2: Supabase projekat + konekcija — **urađeno i provereno** (dev projekat kreiran, `prisma db pull` uspešno konektuje na bazu).
 
 ## Setup
 
@@ -34,8 +34,8 @@ Ovo zahteva pristup Supabase nalogu, pa ne može da se automatizuje iz sesije:
 1. **Napravi DVA Supabase projekta** — jedan za dev, jedan za prod (Free tier je dovoljan za Fazu 1, videti napomenu o Pro tier-u ispod).
 2. U svakom projektu: dugme **Connect** (vrh stranice projekta) → tab **ORM** → izaberi **Prisma** → kopiraj obe ponuđene vrednosti: transaction-mode pooler ide u `DATABASE_URL`, session-mode pooler (za migracije) ide u `DIRECT_URL`.
 3. **Project Settings → Data API**: `Project URL` → `NEXT_PUBLIC_SUPABASE_URL`, `anon public` ključ → `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `service_role` ključ → `SUPABASE_SERVICE_ROLE_KEY` (**nikad** u client kod, nikad u git — samo u `.env.local` lokalno i u Vercel env varijablama za deploy).
-4. Kopiraj `.env.example` u `.env.local` i popuni svih pet vrednosti za dev projekat.
-5. Proveri konekciju: `npx prisma db pull` treba da prođe bez greške (šema je prazna, ali komanda potvrđuje da `DATABASE_URL` radi).
+4. Kopiraj `.env.example` u `.env.local` i popuni svih pet vrednosti za dev projekat. Napravi i običan `.env` (isti sadržaj, ili bar `DATABASE_URL`/`DIRECT_URL`) — **Prisma CLI čita samo `.env`, ne `.env.local`** (to čita Next.js runtime); oba fajla su u `.gitignore`.
+5. Proveri konekciju: `npx prisma db pull`. Poruka `P4001 The introspected database was empty` je **očekivana i znači da konekcija radi** — baza je namerno prazna do Koraka 3, komanda samo potvrđuje da se `DATABASE_URL`/`DIRECT_URL` uspešno povezuju.
 6. Pre nego što prva prava agencija počne svakodnevno da koristi sistem, nadogradi produkcioni projekat na **Supabase Pro** (Free tier nema backup i pauzira se posle 7 dana neaktivnosti).
 
 Kod je već spreman da čita ove varijable čim se popune — nema dodatnih izmena potrebnih posle ovog koraka.
@@ -43,7 +43,7 @@ Kod je već spreman da čita ove varijable čim se popune — nema dodatnih izme
 ## Sledeći koraci (Faza 1)
 
 - [x] Korak 1: repo i projekat (skelet, provereno)
-- [ ] Korak 2: Supabase projekat + konekcija — kod pripremljen, čeka se ručno kreiranje projekta (vidi gore)
+- [x] Korak 2: Supabase projekat + konekcija (dev projekat, konekcija provereno)
 - [ ] Korak 3: `agencies` i `profiles` tabele u Prisma šemi + migracija
 - [ ] Korak 4: Auth (email/password + Google, invite-only)
 - [ ] Korak 5: RLS politike
