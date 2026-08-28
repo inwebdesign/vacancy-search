@@ -20,14 +20,25 @@ enum ProfileRole {
   @@map("profile_role")
 }
 
+// pending: prijavljena (B2B forma), čeka odobrenje tima
+// active: odobrena, uploaduje ponude, klikovi se naplaćuju
+// suspended: privremeno isključena (budžet, plaćanje, kršenje pravila)
+enum AgencyStatus {
+  pending
+  active
+  suspended
+
+  @@map("agency_status")
+}
+
 model Agency {
-  id                   String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                   String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   naziv                String
-  pib                  String  @unique
+  pib                  String       @unique
   kontakt              String
-  cpcCena              Decimal @map("cpc_cena") @db.Decimal(10, 2)
-  mesecniBudzetKlikova Int     @map("mesecni_budzet_klikova")
-  status               String
+  cpcCena              Decimal      @map("cpc_cena") @db.Decimal(10, 2)
+  mesecniBudzetKlikova Int          @map("mesecni_budzet_klikova")
+  status               AgencyStatus @default(pending)
 
   profiles Profile[]
 

@@ -4,7 +4,7 @@ Faza 1, Korak 1: skelet projekta (Next.js App Router + TypeScript + Tailwind + P
 
 Faza 1, Korak 2: Supabase projekat + konekcija — **urađeno i provereno** (dev projekat kreiran, `prisma db pull` uspešno konektuje na bazu).
 
-Faza 1, Korak 3: `agencies` i `profiles` šema — **migracija pripremljena u repo-u, čeka se primena na dev bazu (vidi ispod).**
+Faza 1, Korak 3: `agencies` i `profiles` šema — **urađeno i provereno** (tabele primenjene na dev bazu, potvrđeno u Supabase Table Editor-u). `agencies.status` je enum (`pending`/`active`/`suspended`), dodato drugom migracijom — vidi ispod.
 
 ## Setup
 
@@ -45,21 +45,24 @@ Kod je već spreman da čita ove varijable čim se popune — nema dodatnih izme
 
 ## Korak 3 — primena migracije (radiš ti, lokalno)
 
-Migracija (`prisma/migrations/20260828142855_create_agencies_profiles/`) je već napisana i u repo-u — generisana je offline (`prisma migrate diff`, bez potrebe za konekcijom), pa je ova sesija nije mogla sama primeniti na tvoju bazu jer nema tvoje kredencijale. Ti to radiš lokalno:
+Migracije su napisane i u repo-u — generisane offline (`prisma migrate diff`, bez potrebe za konekcijom), pa ih ova sesija nije mogla sama primeniti na tvoju bazu jer nema tvoje kredencijale. Ti to radiš lokalno, posle svakog `git pull`:
 
-1. Povuci najnoviji `claude/vacancy-search-dashboard-upgrade-dcps3w` (`git pull`).
-2. Proveri da ti `apps/admin/.env` ima ispravne `DATABASE_URL` i `DIRECT_URL` (iz Koraka 2).
-3. Primeni migraciju: `npx prisma migrate deploy` — ovo primenjuje SQL fajl koji je već u repo-u, bez ponovnog generisanja (deterministički, bez shadow baze).
-4. Proveri: `npx prisma db pull` sada treba da prepozna `agencies` i `profiles` (bez P4001 greške), ili otvori Supabase **Table Editor** i vizuelno potvrdi da tabele postoje.
-5. Regeneriši klijent: `npx prisma generate`.
+1. Proveri da ti `apps/admin/.env` ima ispravne `DATABASE_URL` i `DIRECT_URL` (iz Koraka 2).
+2. Primeni migracije: `npx prisma migrate deploy` — primenjuje SQL fajlove koji su već u repo-u, bez ponovnog generisanja (deterministički, bez shadow baze). Uzima sve migracije koje još nisu primenjene, pa je ova komanda ista i za prvu i za svaku narednu migraciju.
+3. Proveri u Supabase **Table Editor** da su tabele/kolone kako treba (`prisma db pull` neće raditi čisto zbog cross-schema FK ka `auth.users` — vidi napomenu ispod).
+4. Regeneriši klijent: `npx prisma generate`.
 
-Napomena o šemi: `profiles.id` ima realnu FK referencu ka `auth.users.id` (Supabase Auth tabela, van Prisma-inog upravljanja) — to je ručno dodato u `migration.sql` jer Prisma po defaultu ne generiše veze ka `auth` šemi. `profiles.agency_id` je opciono (superadmin/operator ne pripadaju jednoj agenciji). `agencies.status` i dalje je slobodan tekst (nije enum) — brief ne definiše dozvoljene vrednosti za taj konkretan slučaj, pa nije proizvoljno pretpostavljeno; to ostaje otvoreno pitanje za kasnije.
+**Migracije do sad:**
+- `20260828142855_create_agencies_profiles` — kreira `agencies` i `profiles`.
+- `20260828150325_agency_status_enum` — menja `agencies.status` iz teksta u enum (`pending`/`active`/`suspended`); odluka doneta u razgovoru posle Koraka 3, brief nije precizirao vrednosti.
+
+Napomena o šemi: `profiles.id` ima realnu FK referencu ka `auth.users.id` (Supabase Auth tabela, van Prisma-inog upravljanja) — to je ručno dodato u `migration.sql` jer Prisma po defaultu ne generiše veze ka `auth` šemi (zbog toga `prisma db pull` baca `P4002` grešku — očekivano, provera se radi kroz Table Editor umesto). `profiles.agency_id` je opciono (superadmin/operator ne pripadaju jednoj agenciji).
 
 ## Sledeći koraci (Faza 1)
 
 - [x] Korak 1: repo i projekat (skelet, provereno)
 - [x] Korak 2: Supabase projekat + konekcija (dev projekat, konekcija provereno)
-- [ ] Korak 3: `agencies` i `profiles` tabele u Prisma šemi + migracija — kod u repo-u, čeka se primena na dev bazu (vidi gore)
+- [x] Korak 3: `agencies` i `profiles` tabele u Prisma šemi + migracija (primenjeno na dev bazu, potvrđeno)
 - [ ] Korak 4: Auth (email/password + Google, invite-only)
 - [ ] Korak 5: RLS politike
 - [ ] Korak 6: middleware za `/admin/*`
