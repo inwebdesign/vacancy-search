@@ -69,10 +69,11 @@ Napomena o šemi: `profiles.id` ima realnu FK referencu ka `auth.users.id` (Supa
 ```
 src/middleware.ts                    Osvežava Supabase sesiju na svakom request-u
 src/app/login/                       Email+password forma + dugme za Google OAuth
-src/app/auth/callback/route.ts       Razmenjuje code za sesiju (OAuth i invite/magic-link)
+src/app/auth/callback/route.ts       Razmenjuje code (OAuth) ili token_hash (invite/magic-link/recovery) za sesiju
 src/app/auth/set-password/           Prva stanica posle invite mejla — korisnik postavlja lozinku
 src/app/auth/mfa/                    TOTP enrollment (QR kod + potvrda 6-cifrenim kodom)
 src/app/auth/logout/route.ts         Odjava
+src/app/api/auth/email/route.ts      Supabase Send Email Hook — šalje auth mejlove preko Resend-a (vidi Ručni deo, stavka 3)
 ```
 
 Nema javne signup forme — jedini način da neko dobije nalog je invite koji šalje superadmin. Za sada se invite šalje ručno kroz Supabase dashboard (Authentication → Users → Invite user) — nije napravljena posebna admin stranica za to u Koraku 4, jer bi bez zaštite ruta (Korak 6) takva stranica bila nezaštićen server-side action sa service_role ovlašćenjima; ta funkcionalnost prirodnije ide uz Korak 6/7 kad postoji role-based pristup.
@@ -83,12 +84,19 @@ MFA stranica (`/auth/mfa`) radi enrollment, ali **ništa je trenutno ne primorav
 
 1. **Isključi javni signup**: Supabase dashboard → Authentication → Sign In / Providers → Email → isključi "Allow new users to sign up" (naziv opcije zavisi od verzije UI-ja; traži nešto u vezi sa "signups"/"registracijom").
 2. **URL Configuration**: Authentication → URL Configuration → `Site URL` postavi na adresu aplikacije (lokalno `http://localhost:3000`, kasnije Vercel domen); u `Redirect URLs` dodaj `<site-url>/auth/callback`.
-3. **Invite email redirect**: Authentication → Email Templates → "Invite user" — u linku podesi redirect da vodi na `/auth/callback?next=/auth/set-password` (umesto podrazumevanog), da novi korisnik posle klika na invite odmah završi na strani za postavljanje lozinke.
+3. **Invite email redirect preko Send Email Hook-a**: editovanje email template-a (Authentication → Emails) nije dostupno bez Pro plana, pa se umesto toga koristi **Authentication → Hooks → Send Email** hook — Supabase tada POST-uje podatke o mejlu na naš endpoint umesto da sam šalje mejl kroz ugrađeni mailer (koji na free tier-u ima i vrlo mali rate limit).
+   - Uključi hook, tip **HTTPS**, URL = `<site-url>/api/auth/email`, generiši **Secret** (`v1,whsec_...` format).
+   - Napravi nalog na [Resend](https://resend.com) (besplatan tier), uzmi API key.
+   - U `.env.local`/Vercel env popuni: `SUPABASE_AUTH_HOOK_SECRET` (secret iz hook-a), `RESEND_API_KEY`, opciono `EMAIL_FROM` (default `onboarding@resend.dev`, radi bez verifikacije domena za slanje sebi).
+   - Endpoint ([src/app/api/auth/email/route.ts](src/app/api/auth/email/route.ts)) verifikuje potpis, gradi link `.../auth/callback?token_hash=...&type=...&next=...` (invite/recovery idu na `/auth/set-password`) i šalje ga preko Resend-a; `/auth/callback` hvata `token_hash`+`type`, zove `verifyOtp`, redirect-uje na `next`.
+   - **Napomena**: Supabase Cloud mora da pozove ovaj URL preko javnog HTTPS-a — `localhost` ne radi. Dok se ne uradi prvi deploy (Vercel), invite/recovery mejlovi se ne mogu testirati end-to-end; ostali auth flow-ovi (login, Google OAuth, MFA) rade lokalno nezavisno od ovoga.
 4. **Google OAuth provider**: Authentication → Providers → Google → uključi, potreban ti je `Client ID` i `Client Secret` iz [Google Cloud Console](https://console.cloud.google.com/apis/credentials) (OAuth 2.0 Client, tip "Web application", authorized redirect URI je URL koji Supabase prikaže na toj istoj stranici — oblika `https://<project-ref>.supabase.co/auth/v1/callback`).
-5. **Rate limiting na login**: Authentication → Rate Limits ima ugrađeno ograničenje po IP-u za sign-in pokušaje — podesi ga. Napomena: brief traži tačno "5 pokušaja/15min po IP+email" (kombinovani ključ) — Supabase-ov ugrađeni limiter radi po IP-u, ne po IP+email kombinaciji, pa ovo pokriva prevenciju grubo, ne tačno po specifikaciji; precizniji limiter (custom, sa perzistentnim brojačem) nije napravljen u Koraku 4 da se ne bi gradila infrastruktura (KV/Redis) koja još nije deo stack-a — ostaje otvoreno za kasnije.
+5. **Rate limiting na login**: Authentication → Rate Limits → **"Rate limit for sign-ups and sign-ins"** postavljeno na **1 request/5 min po IP** (=12/sat). Brief traži tačno "5 pokušaja/15min po IP+email" (kombinovani ključ, =20/sat) — Supabase-ov ugrađeni limiter radi po IP-u (ne IP+email) i samo u fiksnim 5-min prozorima (20/sat nije deljivo na cele brojeve po 5 min), pa je izabrana strožija vrednost (12/sat) kao gruba aproksimacija, ne tačna specifikacija; precizniji limiter (custom, sa perzistentnim brojačem po IP+email) nije napravljen u Koraku 4 da se ne bi gradila infrastruktura (KV/Redis) koja još nije deo stack-a — ostaje otvoreno za kasnije. Ostala polja na toj stranici (`token verifications`, `token refreshes`, `anonymous users`, `Web3`) ostavljena na default — nisu deo ovog zahteva, a snižavanje `token verifications` bi rizikovalo blokiranje legitimnih klikova na invite/reset/magic-link mejlove.
 6. **MFA enforcement politika**: Supabase ima projekt-nivo MFA podešavanja (Authentication → Multi-Factor Authentication) — pogledaj da li tvoja verzija dashboard-a nudi opciju da zahteva MFA za određene korisnike; ako ne, enforcement ostaje na app-level proveri koja se pravi u Koraku 6.
 
 ### Provera da radi
+
+*(koraci 1-2 rade tek posle prvog deploy-a — vidi napomenu o hook-u iznad)*
 
 1. Pošalji sebi invite kroz Supabase dashboard (svojim mejlom, sa `agency_id = null`, ulogom `superadmin` — profil moraš ručno uneti u `profiles` tabelu pošto UI za to još ne postoji, videti Table Editor).
 2. Klikni link iz mejla → treba da završiš na `/auth/set-password` → postavi lozinku → redirect na `/`.
