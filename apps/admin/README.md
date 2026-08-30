@@ -6,7 +6,9 @@ Faza 1, Korak 2: Supabase projekat + konekcija — **urađeno i provereno** (dev
 
 Faza 1, Korak 3: `agencies` i `profiles` šema — **urađeno i provereno** (tabele primenjene na dev bazu, potvrđeno u Supabase Table Editor-u). `agencies.status` je enum (`pending`/`active`/`suspended`), dodato drugom migracijom — vidi ispod.
 
-Faza 1, Korak 4: Auth — **kod urađen, čeka se ručno podešavanje u Supabase/Google Cloud (vidi ispod)**, pa provera end-to-end.
+Faza 1, Korak 4: Auth — **urađeno i provereno** (login, invite, MFA enrollment — testirano end-to-end).
+
+Faza 1, Korak 5: RLS na `agencies`/`profiles` — **kod u repo-u, čeka se primena i test sa dva realna naloga (vidi ispod).**
 
 ## Setup
 
@@ -94,13 +96,32 @@ MFA stranica (`/auth/mfa`) radi enrollment, ali **ništa je trenutno ne primorav
 4. Probaj i "Prijavi se preko Google-a" dugme (posle koraka 4 iznad).
 5. Otvori `/auth/mfa`, skeniraj QR kod i potvrdi da enrollment prolazi.
 
+## Korak 5 — RLS
+
+### Šta politika radi
+
+Dve `SECURITY DEFINER` helper funkcije (`current_profile_role()`, `current_profile_agency_id()`) čitaju ulogovanog korisnika iz `profiles` bez okidanja RLS-a na `profiles` — bez njih bi policy na `profiles` koji čita `profiles` da bi odlučio pristup izazvao beskonačnu rekurziju.
+
+- **agencies** — SELECT: superadmin/operator vide sve, agency_admin/agency_user vide samo svoju agenciju. INSERT/UPDATE/DELETE: samo superadmin (poklapa se sa sekcijom 6 brief-a — "superadmin... upravljanje... CPC cenama").
+- **profiles** — SELECT: sopstveni red, kolege iz iste agencije, ili superadmin/operator (svi). INSERT/UPDATE/DELETE: samo superadmin — namerno nema samostalnog uređivanja sopstvenog profila, jer bi to (bez posebne kolonske zaštite koja još ne postoji) otvorilo mogućnost da korisnik sebi promeni `role` ili `agency_id`.
+
+### Primena i test (radiš ti, lokalno)
+
+1. `git pull`, pa `npx prisma migrate deploy` (ista komanda kao pre).
+2. Napravi drugi test nalog: invite kroz Supabase dashboard, ulogu `agency_admin`, sa `agency_id` različitim od tvog prvog test naloga (uređuješ direktno u Table Editor-u posle prihvatanja invite-a — nema još UI-ja za ovo).
+3. Uloguj se kao prvi `agency_admin` nalog, otvori Supabase **SQL Editor** ili koristi `supabase.auth.getSession()` da izvučeš access token, pa pozovi REST API direktno (`GET {SUPABASE_URL}/rest/v1/agencies` sa `Authorization: Bearer <token>` i `apikey: <anon key>` header-ima) — treba da vidiš SAMO svoju agenciju, ne drugu.
+4. Ponovi sa drugim nalogom, potvrdi da vidi samo svoju.
+5. Probaj i `profiles` isto — svaki agency_admin treba da vidi samo profile iz svoje agencije (plus sopstveni red).
+
+Ovo je direktno test scenario iz brief-a ("dva različita agency_admin naloga... ni direktnim API pozivom") — testirano sa realnim tokenom, ne pretpostavljeno.
+
 ## Sledeći koraci (Faza 1)
 
 - [x] Korak 1: repo i projekat (skelet, provereno)
 - [x] Korak 2: Supabase projekat + konekcija (dev projekat, konekcija provereno)
 - [x] Korak 3: `agencies` i `profiles` tabele u Prisma šemi + migracija (primenjeno na dev bazu, potvrđeno)
-- [ ] Korak 4: Auth (email/password + Google, invite-only) — kod gotov, čeka se ručno podešavanje i end-to-end provera (vidi gore)
-- [ ] Korak 5: RLS politike
+- [x] Korak 4: Auth (email/password + Google, invite-only) — testirano end-to-end
+- [ ] Korak 5: RLS politike — kod u repo-u, čeka se primena i test sa dva naloga (vidi gore)
 - [ ] Korak 6: middleware za `/admin/*`
 - [ ] Korak 7: role-based navigacija (skelet)
 - [ ] Korak 8: audit log
