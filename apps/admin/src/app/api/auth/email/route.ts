@@ -4,8 +4,6 @@ import { Resend } from "resend";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { z } from "zod";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 const payloadSchema = z.object({
   user: z.object({ email: z.string().email() }),
   email_data: z.object({
@@ -66,6 +64,7 @@ export async function POST(request: Request) {
   const next = NEXT_BY_TYPE[email_data.email_action_type] ?? "/";
   const link = `${email_data.site_url}/auth/callback?token_hash=${email_data.token_hash}&type=${otpType}&next=${next}`;
 
+  const resend = new Resend(process.env.RESEND_API_KEY);
   const { error } = await resend.emails.send({
     from: process.env.EMAIL_FROM ?? "onboarding@resend.dev",
     to: user.email,

@@ -8,7 +8,9 @@ Faza 1, Korak 3: `agencies` i `profiles` šema — **urađeno i provereno** (tab
 
 Faza 1, Korak 4: Auth — **urađeno i provereno** (login, invite, MFA enrollment — testirano end-to-end).
 
-Faza 1, Korak 5: RLS na `agencies`/`profiles` — **kod u repo-u, čeka se primena i test sa dva realna naloga (vidi ispod).**
+Faza 1, Korak 5: RLS na `agencies`/`profiles` — **urađeno i provereno** (primenjeno, testirano sa dva `agency_admin` naloga u različitim agencijama — svaki vidi samo svoju).
+
+Faza 1, Korak 6: middleware za `/admin/*` — **urađeno i provereno** (redirect neulogovanih na `/login`, `next` vraća korisnika nazad posle prijave). MFA enforcement za superadmin/operator namerno nije uključen — vidi napomenu ispod.
 
 ## Setup
 
@@ -123,13 +125,38 @@ Dve `SECURITY DEFINER` helper funkcije (`current_profile_role()`, `current_profi
 
 Ovo je direktno test scenario iz brief-a ("dva različita agency_admin naloga... ni direktnim API pozivom") — testirano sa realnim tokenom, ne pretpostavljeno.
 
+## Korak 6 — middleware za `/admin/*`
+
+### Šta radi
+
+```
+src/middleware.ts               Redirect neulogovanih sa /admin/* na /login?next=<putanja>
+src/app/admin/page.tsx          Skelet zaštićene rute (samo email + uloga, bez navigacije)
+```
+
+- Neulogovan korisnik koji pokuša `/admin` (ili bilo koju `/admin/*` podrutu) biva redirect-ovan na `/login?next=/admin/...`.
+- Login flow (email+lozinka i Google) sad čita `next` i vraća korisnika tačno tamo posle uspešne prijave, umesto uvek na `/` — provereno i u `/auth/callback` i u login server action-u, oba validiraju da `next` počinje sa jednim `/` (ne `//`), da se spreči open-redirect kroz taj parametar.
+- `AdminPage` server component i sam zove `getUser()` kao odbrana u dubinu — ne oslanja se isključivo na middleware.
+
+**Namerno izostavljeno**: MFA enforcement za superadmin/operator uloge (pomenuto u Koraku 4 kao "prirodno mesto je middleware"). Trenutna `/auth/mfa` stranica radi samo enrollment (upis novog TOTP faktora), ne i challenge/verify postojećeg faktora pri svakom loginu — potrebna je nova stranica za to. Ostaje otvorena stavka za sledeći korak.
+
+### Test (radiš ti, lokalno)
+
+1. Odjavi se, otvori `http://localhost:3000/admin` direktno — treba da te odbaci na `/login?next=%2Fadmin`.
+2. Uloguj se (email+lozinka ili Google) — treba da završiš tačno na `/admin`, ne na `/`.
+3. Dok si ulogovan, otvori `/admin` ponovo — treba normalno da se prikaže (email + uloga iz `profiles`).
+
+### Napomena — duplirane React verzije (build bug, nepovezano sa ovim korakom)
+
+`npm run build` je pucao sa "Minified React error #31" na `/404` stranici zbog toga što su `apps/site` (React 18) i `apps/admin` (React 19) u monorepo-u dobili nekonzistentno hoistovane kopije `react`/`react-dom` posle jednog ranijeg `npm install --workspace=apps/admin` poziva. Rešeno brisanjem svih `node_modules` foldera i `package-lock.json`, pa svežim `npm install` iz root-a. `package-lock.json` je namerno u `.gitignore` (nema commit-ovan lockfile za monorepo), pa ako se ovo opet pojavi posle instaliranja novog paketa, isti fix (clean reinstall iz root-a) treba da pomogne.
+
 ## Sledeći koraci (Faza 1)
 
 - [x] Korak 1: repo i projekat (skelet, provereno)
 - [x] Korak 2: Supabase projekat + konekcija (dev projekat, konekcija provereno)
 - [x] Korak 3: `agencies` i `profiles` tabele u Prisma šemi + migracija (primenjeno na dev bazu, potvrđeno)
 - [x] Korak 4: Auth (email/password + Google, invite-only) — testirano end-to-end
-- [ ] Korak 5: RLS politike — kod u repo-u, čeka se primena i test sa dva naloga (vidi gore)
-- [ ] Korak 6: middleware za `/admin/*`
+- [x] Korak 5: RLS politike — primenjeno, testirano sa dva `agency_admin` naloga (vidi gore)
+- [x] Korak 6: middleware za `/admin/*` — testirano (vidi gore); MFA enforcement ostaje otvoreno
 - [ ] Korak 7: role-based navigacija (skelet)
 - [ ] Korak 8: audit log

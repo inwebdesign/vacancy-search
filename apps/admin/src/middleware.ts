@@ -1,9 +1,11 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-// Faza 1, Korak 4: samo osvežava Supabase sesiju (cookie refresh) na svakom
-// request-u. Zaštita /admin/* ruta (redirect neulogovanih) dolazi u Koraku 6 —
-// namerno odvojeno, da bi Korak 4 mogao da se testira nezavisno.
+// Faza 1, Korak 4: osvežava Supabase sesiju (cookie refresh) na svakom
+// request-u. Faza 1, Korak 6: štiti /admin/* — redirect neulogovanih na
+// /login sa ?next= (login flow ih vraća nazad posle uspešne prijave).
+// Namerno samo route protection — MFA enforcement (obavezan MFA za
+// superadmin/operator) je otvorena stavka za sledeći korak, vidi README.
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
     request: { headers: request.headers },
@@ -38,7 +40,15 @@ export async function middleware(request: NextRequest) {
     },
   );
 
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (request.nextUrl.pathname.startsWith("/admin") && !user) {
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("next", request.nextUrl.pathname);
+    return NextResponse.redirect(loginUrl);
+  }
 
   return response;
 }

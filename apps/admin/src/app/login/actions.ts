@@ -31,5 +31,9 @@ export async function signInWithPassword(
     return { error: "Pogrešan email ili lozinka." };
   }
 
-  redirect("/");
+  const next = formData.get("next");
+  const isSafeNext =
+    typeof next === "string" && next.startsWith("/") && !next.startsWith("//");
+
+  redirect(isSafeNext ? next : "/");
 }
