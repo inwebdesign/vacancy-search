@@ -1,5 +1,6 @@
 // Faza 1, Korak 3: agencies i profiles (šema iz projektnog brief-a, sekcija 5).
-// Ostale tabele (uploads, offers, clicks, audit_log) dolaze u kasnijim koracima.
+// Faza 1, Korak 8: audit_log.
+// Ostale tabele (uploads, offers, clicks) dolaze u Fazi 2.
 
 generator client {
   provider = "prisma-client-js"
@@ -56,4 +57,22 @@ model Profile {
   agency Agency? @relation(fields: [agencyId], references: [id], onDelete: SetNull)
 
   @@map("profiles")
+}
+
+// Namerno BEZ FK na actor_id/target_id — subjekat (profil, kasnije agencija,
+// ponuda...) može kasnije biti obrisan (npr. "Ukloni člana" iz Koraka 7), a
+// audit trag treba da preživi to brisanje čitljiv (zato i actor_email/diff
+// snapshot, ne samo id). Upisuje se isključivo server-side preko
+// service_role (lib/audit/log.ts) — RLS dozvoljava samo SELECT.
+model AuditLog {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorId     String?  @map("actor_id") @db.Uuid
+  actorEmail  String?  @map("actor_email")
+  action      String
+  targetTable String   @map("target_table")
+  targetId    String?  @map("target_id") @db.Uuid
+  diff        Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("audit_log")
 }

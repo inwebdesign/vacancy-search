@@ -5,6 +5,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentProfile } from "@/lib/auth/current-profile";
+import { logAudit } from "@/lib/audit/log";
 
 const ROLES = ["superadmin", "operator", "agency_admin", "agency_user"] as const;
 const roleSchema = z.enum(ROLES);
@@ -15,9 +16,20 @@ export async function updateMemberRole(memberId: string, role: string) {
     return { error: "Nevažeća uloga." };
   }
 
+  const me = await getCurrentProfile();
+  if (!me) {
+    return { error: "Niste ulogovani." };
+  }
+
   // Oslanja se na profiles_update_agency_admin/superadmin RLS policy —
   // nema dodatne provere ovde, baza odlučuje da li je izmena dozvoljena.
   const supabase = await createClient();
+  const { data: before } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", memberId)
+    .single();
+
   const { error } = await supabase
     .from("profiles")
     .update({ role: parsedRole.data })
@@ -26,6 +38,15 @@ export async function updateMemberRole(memberId: string, role: string) {
   if (error) {
     return { error: "Izmena nije uspela — nemate dozvolu za tu izmenu." };
   }
+
+  await logAudit({
+    actorId: me.userId,
+    actorEmail: me.email,
+    action: "profile.role_change",
+    targetTable: "profiles",
+    targetId: memberId,
+    diff: { role: { before: before?.role ?? null, after: parsedRole.data } },
+  });
 
   revalidatePath("/admin/team");
   return { success: true };
@@ -66,6 +87,15 @@ export async function removeMember(memberId: string) {
   if (error) {
     return { error: `Uklanjanje nije uspelo: ${error.message}` };
   }
+
+  await logAudit({
+    actorId: me.userId,
+    actorEmail: me.email,
+    action: "profile.remove",
+    targetTable: "profiles",
+    targetId: memberId,
+    diff: { removed: { role: target.role, agency_id: target.agency_id } },
+  });
 
   revalidatePath("/admin/team");
   return { success: true };
@@ -135,6 +165,15 @@ export async function inviteTeamMember(
       error: `Pozivnica poslata, ali upis profila nije uspeo: ${profileError.message}`,
     };
   }
+
+  await logAudit({
+    actorId: me.userId,
+    actorEmail: me.email,
+    action: "profile.invite",
+    targetTable: "profiles",
+    targetId: invited.user.id,
+    diff: { email, role, agency_id: agencyId },
+  });
 
   revalidatePath("/admin/team");
   return { success: true };

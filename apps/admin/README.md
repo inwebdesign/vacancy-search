@@ -12,7 +12,9 @@ Faza 1, Korak 5: RLS na `agencies`/`profiles` — **urađeno i provereno** (prim
 
 Faza 1, Korak 6: middleware za `/admin/*` — **urađeno i provereno** (redirect neulogovanih na `/login`, `next` vraća korisnika nazad posle prijave). MFA enforcement za superadmin/operator namerno nije uključen — vidi napomenu ispod.
 
-Faza 1, Korak 7: role-based navigacija + Tim — **kod u repo-u, čeka se primena nove migracije i test (vidi ispod)**. Nav skelet (6 sekcija filtriranih po ulozi), pune CRUD funkcije samo na "Tim" (ostalo su placeholder stranice do Faze 2).
+Faza 1, Korak 7: role-based navigacija + Tim — **urađeno i provereno** (nav skelet, 6 sekcija filtriranih po ulozi; pune CRUD funkcije na "Tim", ostalo placeholder do Faze 2).
+
+Faza 1, Korak 8: Audit log — **kod u repo-u, čeka se primena nove migracije i test (vidi ispod)**. Loguje Tim akcije (invite/role_change/remove); vidljivo samo superadmin/operator-u.
 
 ## Setup
 
@@ -163,7 +165,7 @@ src/app/admin/layout.tsx             Top bar (email, uloga, odjava) + nav filtri
 src/app/admin/agencies/              Placeholder ("Uskoro — Faza 2")
 src/app/admin/offers/                Placeholder
 src/app/admin/stats/                 Placeholder
-src/app/admin/audit-log/             Placeholder
+src/app/admin/audit-log/             Placeholder u Koraku 7, prava stranica dodata u Koraku 8 (vidi ispod)
 src/app/admin/team/                  Puna funkcija: lista tima, promena uloge, uklanjanje, pozivanje novog člana
 prisma/migrations/20260903150000_agency_admin_team_rls/   Nova RLS policy (vidi ispod)
 ```
@@ -193,6 +195,29 @@ Pozivanje **novog** člana (koji još nema `auth.users` red) takođe ide isklju�
 4. Uloguj se kao `agency_user` — proveri da NEMAŠ "Tim" u nav-u, i da direktan odlazak na `/admin/team` vraća na `/admin` (redirect iz `requireRole`).
 5. Probaj i direktan URL na `/admin/audit-log` kao `agency_admin` — treba isto da te vrati na `/admin`.
 
+## Korak 8 — Audit log
+
+### Šta radi
+
+```
+prisma/migrations/20260908120000_audit_log/   Nova tabela audit_log + RLS (vidi ispod)
+src/lib/audit/log.ts                          logAudit(...) — upis preko service_role, best-effort (greška se samo loguje, ne obara akciju)
+src/app/admin/audit-log/page.tsx              Prava stranica (zamenjuje placeholder iz Koraka 7) — poslednjih 100 zapisa
+```
+
+`audit_log` namerno **nema FK** na `actor_id`/`target_id` — subjekat (profil) može kasnije biti obrisan (npr. "Ukloni člana" iz Koraka 7 briše `auth.users`, što cascade-uje `profiles`), a trag treba da ostane čitljiv i posle toga. Zato `actor_email` čuva snapshot u trenutku upisa, ne live referencu.
+
+RLS: SELECT samo za `superadmin`/`operator` (poklapa se sa nav pravima iz Koraka 7). Namerno nema INSERT/UPDATE/DELETE policy — upis ide isključivo preko `service_role` (`lib/audit/log.ts`), koji zaobilazi RLS; bez policy-ja niko preko obične sesije ne može da piše niti menja log (nepromenljiv trag).
+
+**Šta se trenutno loguje**: samo Tim akcije iz Koraka 7 (`profile.invite`, `profile.role_change`, `profile.remove`) — to su jedine prave mutacije koje trenutno postoje u kodu. Kad se u Fazi 2 doda CRUD za agencije/ponude, iste `logAudit(...)` pozive treba dodati i tamo.
+
+### Primena i test (radiš ti, lokalno)
+
+1. `git pull`, pa `npx prisma migrate deploy` (iz `apps/admin`).
+2. Kao superadmin ili agency_admin, na `/admin/team`: pozovi novog člana, promeni nekome ulogu, ukloni nekoga — tri akcije, tri različita `action` tipa.
+3. Otvori `/admin/audit-log` (kao superadmin) — treba da vidiš sva tri zapisa, sa ispravnim `Ko`/`Akcija`/`Detalji` (JSON diff).
+4. Uloguj se kao `agency_admin` ili `agency_user` i probaj `/admin/audit-log` direktno — `agency_admin` treba da bude vraćen na `/admin` (nema pristup po nav matrici), `agency_user` isto (nema ni "Tim" ni "Audit log").
+
 ## Tech debt / otvorene odluke (za kasnije)
 
 Stavke koje su namerno odložene tokom razgovora o Koraku 7 — ne blokiraju trenutni rad, ali ih treba rešiti pre nego što postanu relevantne:
@@ -211,5 +236,5 @@ Stavke koje su namerno odložene tokom razgovora o Koraku 7 — ne blokiraju tre
 - [x] Korak 4: Auth (email/password + Google, invite-only) — testirano end-to-end
 - [x] Korak 5: RLS politike — primenjeno, testirano sa dva `agency_admin` naloga (vidi gore)
 - [x] Korak 6: middleware za `/admin/*` — testirano (vidi gore); MFA enforcement ostaje otvoreno
-- [ ] Korak 7: role-based navigacija + Tim — kod u repo-u, čeka se primena migracije i test (vidi gore)
-- [ ] Korak 8: audit log
+- [x] Korak 7: role-based navigacija + Tim — testirano sa sve tri role (vidi gore)
+- [ ] Korak 8: audit log — kod u repo-u, čeka se primena migracije i test (vidi gore)
