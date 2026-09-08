@@ -12,6 +12,8 @@ Faza 1, Korak 5: RLS na `agencies`/`profiles` — **urađeno i provereno** (prim
 
 Faza 1, Korak 6: middleware za `/admin/*` — **urađeno i provereno** (redirect neulogovanih na `/login`, `next` vraća korisnika nazad posle prijave). MFA enforcement za superadmin/operator namerno nije uključen — vidi napomenu ispod.
 
+Faza 1, Korak 7: role-based navigacija + Tim — **kod u repo-u, čeka se primena nove migracije i test (vidi ispod)**. Nav skelet (6 sekcija filtriranih po ulozi), pune CRUD funkcije samo na "Tim" (ostalo su placeholder stranice do Faze 2).
+
 ## Setup
 
 ```bash
@@ -150,6 +152,57 @@ src/app/admin/page.tsx          Skelet zaštićene rute (samo email + uloga, bez
 
 `npm run build` je pucao sa "Minified React error #31" na `/404` stranici zbog toga što su `apps/site` (React 18) i `apps/admin` (React 19) u monorepo-u dobili nekonzistentno hoistovane kopije `react`/`react-dom` posle jednog ranijeg `npm install --workspace=apps/admin` poziva. Rešeno brisanjem svih `node_modules` foldera i `package-lock.json`, pa svežim `npm install` iz root-a. `package-lock.json` je namerno u `.gitignore` (nema commit-ovan lockfile za monorepo), pa ako se ovo opet pojavi posle instaliranja novog paketa, isti fix (clean reinstall iz root-a) treba da pomogne.
 
+## Korak 7 — role-based navigacija + Tim
+
+### Šta radi
+
+```
+src/lib/auth/current-profile.ts      getCurrentProfile() — ulogovan user + role/agency_id iz profiles
+src/lib/auth/require-role.ts         requireRole([...]) — redirect ako uloga nije dozvoljena, koristi svaka /admin/* stranica
+src/app/admin/layout.tsx             Top bar (email, uloga, odjava) + nav filtriran po ulozi (samo UI, ne zaštita)
+src/app/admin/agencies/              Placeholder ("Uskoro — Faza 2")
+src/app/admin/offers/                Placeholder
+src/app/admin/stats/                 Placeholder
+src/app/admin/audit-log/             Placeholder
+src/app/admin/team/                  Puna funkcija: lista tima, promena uloge, uklanjanje, pozivanje novog člana
+prisma/migrations/20260903150000_agency_admin_team_rls/   Nova RLS policy (vidi ispod)
+```
+
+Prava po sekciji (superadmin / operator / agency_admin / agency_user):
+
+| Sekcija | superadmin | operator | agency_admin | agency_user |
+|---|---|---|---|---|
+| Početna, Agencije, Ponude | ✓ | ✓ | ✓ | ✓ |
+| Statistika | ✓ | ✓ | ✓ | — |
+| Tim | ✓ | — | ✓ | — |
+| Audit log | ✓ | ✓ | — | — |
+
+Svaka stranica sama zove `requireRole(...)` — nav filter u layout-u je samo kozmetika (krije linkove), ne stvarna zaštita; direktan URL i dalje prolazi kroz `requireRole` + RLS.
+
+### RLS izmena
+
+Korak 5 je `profiles` UPDATE/DELETE ostavio isključivo superadmin-u. Nova migracija dodaje **jednu** policy: `agency_admin` sme `UPDATE` na `profiles` gde je `agency_id` = njegova agencija, **i** nova vrednost `role` mora ostati `agency_admin`/`agency_user` (ne sme promovisati sebe/kolegu na superadmin/operator) **i** `agency_id` ne sme da se promeni (ne sme prebaciti nekog u drugu agenciju). DELETE namerno nije dodat kao RLS policy — "Ukloni člana" briše `auth.users` red (cascade briše i `profiles`), što zahteva `service_role` i ručnu proveru dozvole u server akciji, ne ide kroz RLS.
+
+Pozivanje **novog** člana (koji još nema `auth.users` red) takođe ide isključivo preko `service_role` (`inviteUserByEmail` + insert u `profiles`) uz ručnu proveru u [team/actions.ts](src/app/admin/team/actions.ts): agency_admin može da poziva samo u svoju agenciju, samo sa ulogom agency_admin/agency_user; superadmin bira bilo koju ulogu/agenciju.
+
+### Primena i test (radiš ti, lokalno)
+
+1. `git pull`, pa `npx prisma migrate deploy` (iz `apps/admin`).
+2. Uloguj se kao superadmin — proveri da vidiš svih 6 stavki u nav-u, da `/admin/team` prikazuje sve naloge iz svih agencija, i da možeš da pozoveš novog člana birajući bilo koju ulogu/agenciju.
+3. Uloguj se kao `agency_admin` — proveri da u nav-u vidiš samo Početna/Agencije/Ponude/Statistika/Tim (bez Audit log-a), da `/admin/team` prikazuje samo tvoju agenciju, da možeš da promeniš ulogu kolegi (agency_admin ↔ agency_user) i da ga ukloniš, i da invite forma nudi samo te dve uloge sa fiksnom (skrivenom) tvojom agencijom.
+4. Uloguj se kao `agency_user` — proveri da NEMAŠ "Tim" u nav-u, i da direktan odlazak na `/admin/team` vraća na `/admin` (redirect iz `requireRole`).
+5. Probaj i direktan URL na `/admin/audit-log` kao `agency_admin` — treba isto da te vrati na `/admin`.
+
+## Tech debt / otvorene odluke (za kasnije)
+
+Stavke koje su namerno odložene tokom razgovora o Koraku 7 — ne blokiraju trenutni rad, ali ih treba rešiti pre nego što postanu relevantne:
+
+- **`operator` uloga** — enum vrednost postoji u šemi, ali opseg prava nije definisan (verovatno read-only nadzor preko svih agencija). Nema potrebe dok postoji samo superadmin nalog; definisati kad se pojavi stvarna potreba za drugim internim korisnikom.
+- **MFA enforcement za superadmin/operator** (pomenuto u Koraku 6) — obavezan MFA nije ožičen, `/auth/mfa` trenutno radi samo enrollment, ne i challenge/verify postojećeg faktora pri loginu. Treba nova stranica + middleware provera `aal` nivoa.
+- **Moderacija ponuda (`offers`, Faza 2)** — nove agencije treba da prođu ručno odobravanje (superadmin) za prvih nekoliko unosa pre nego što dobiju pravo da objavljuju direktno. Predlog mehanizma: polje na `agencies` (npr. `auto_publish: bool`, default `false`) koje kontroliše da li nove ponude te agencije idu odmah u status `active` ili čekaju `pending` odobrenje; superadmin ručno prebacuje agenciju na `auto_publish = true` kad joj veruje (npr. posle X odobrenih unosa bez problema). Dizajn detalja (šta tačno "par publisheva" znači, da li je broj konfigurabilan) nije odrađen.
+- **Rezervisani-ali-neplaćeni datumi (`offer_unavailable_dates`, Faza 2)** — treba `status` kolona (`pending`/`confirmed`), ne samo prost opseg datuma. Poslovna odluka da li `pending` (rezervisano, neplaćeno) blokira termin za druge kupce ili ostaje "dostupno" dok se ne potvrdi plaćanje — nije doneta.
+- **Recenzije (`reviews`, van admin panela)** — dogovoreno da gost ocenjuje posle boravka (ne agencija sama sebe unosi rating). Treba sistem zaštite od lažnih recenzija (npr. dozvoliti ocenu samo gostu koji je stvarno bookirao preko sajta) — dizajn nije urađen, ostaje za kad se gradi javni review flow na `apps/site`.
+
 ## Sledeći koraci (Faza 1)
 
 - [x] Korak 1: repo i projekat (skelet, provereno)
@@ -158,5 +211,5 @@ src/app/admin/page.tsx          Skelet zaštićene rute (samo email + uloga, bez
 - [x] Korak 4: Auth (email/password + Google, invite-only) — testirano end-to-end
 - [x] Korak 5: RLS politike — primenjeno, testirano sa dva `agency_admin` naloga (vidi gore)
 - [x] Korak 6: middleware za `/admin/*` — testirano (vidi gore); MFA enforcement ostaje otvoreno
-- [ ] Korak 7: role-based navigacija (skelet)
+- [ ] Korak 7: role-based navigacija + Tim — kod u repo-u, čeka se primena migracije i test (vidi gore)
 - [ ] Korak 8: audit log
