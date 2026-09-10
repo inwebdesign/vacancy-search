@@ -1,6 +1,6 @@
 // Faza 1, Korak 3: agencies i profiles (šema iz projektnog brief-a, sekcija 5).
 // Faza 1, Korak 8: audit_log.
-// Ostale tabele (uploads, offers, clicks) dolaze u Fazi 2.
+// Faza 2, Korak 1: uploads, offers, clicks (brief sekcija 5 i 8).
 
 generator client {
   provider = "prisma-client-js"
@@ -42,6 +42,9 @@ model Agency {
   status               AgencyStatus @default(pending)
 
   profiles Profile[]
+  uploads  Upload[]
+  offers   Offer[]
+  clicks   Click[]
 
   @@map("agencies")
 }
@@ -54,9 +57,124 @@ model Profile {
   role      ProfileRole
   createdAt DateTime    @default(now()) @map("created_at")
 
-  agency Agency? @relation(fields: [agencyId], references: [id], onDelete: SetNull)
+  agency  Agency?  @relation(fields: [agencyId], references: [id], onDelete: SetNull)
+  uploads Upload[]
 
   @@map("profiles")
+}
+
+// Faza 2, Korak 1: uploads/offers/clicks (brief sekcija 5, 8, 9).
+//
+// tip/status enum vrednosti nisu bile precizirane u brief-u — odluka doneta
+// tokom rada, otvoreno za korekciju.
+enum UploadType {
+  excel
+  csv
+  pdf
+
+  @@map("upload_type")
+}
+
+// pending: upload primljen, čeka obradu (odmah po prijemu, pre bilo kakvog parsiranja)
+// processing: parsing u toku (background job, Korak 3/4)
+// completed: parsing gotov (bez obzira da li je sve prošlo ili deo otišao u review queue)
+// failed: parsing nije uspeo (npr. nečitljiv fajl) — ne treba mešati sa "offer čeka review",
+// to je offers.status = pending_review, ne uploads.status
+enum UploadStatus {
+  pending
+  processing
+  completed
+  failed
+
+  @@map("upload_status")
+}
+
+// Originalni fajl se čuva nepromenjen u Supabase Storage (originalniFajlUrl),
+// nikad se ne briše — čak i posle uspešnog parsiranja, radi audit traga.
+model Upload {
+  id               String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  agencyId         String       @map("agency_id") @db.Uuid
+  originalniFajlUrl String      @map("originalni_fajl_url")
+  tip              UploadType
+  status           UploadStatus @default(pending)
+  // Nullable + SetNull (ne Restrict) — isti razlog kao audit_log.actor_id:
+  // "Ukloni člana" (Korak 7) briše auth.users/profiles, a stari upload ne
+  // sme time da postane neizbrisiv niti da blokira uklanjanje tog naloga.
+  uploadedBy       String?      @map("uploaded_by") @db.Uuid
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  agency Agency   @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  editor Profile? @relation(fields: [uploadedBy], references: [id], onDelete: SetNull)
+  offers Offer[]
+
+  @@map("uploads")
+}
+
+// status enum tačno po brief-u (sekcija 5): pending_review, published, rejected, expired.
+// "expired" se koristi i za rekonsilijaciju punog snapshot-a (Korak 3) — ponuda
+// koja je postojala iz prethodnog upload-a te agencije, ali nije prisutna u
+// najnovijem, prelazi u expired umesto da se briše (audit trag).
+enum OfferStatus {
+  pending_review
+  published
+  rejected
+  expired
+
+  @@map("offer_status")
+}
+
+model Offer {
+  id               String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  agencyId         String      @map("agency_id") @db.Uuid
+  uploadId         String      @map("upload_id") @db.Uuid
+  naziv            String
+  destinacija      String
+  datumPolaska     DateTime    @map("datum_polaska") @db.Date
+  datumPovratka    DateTime    @map("datum_povratka") @db.Date
+  cenaEur          Decimal     @map("cena_eur") @db.Decimal(10, 2)
+  maxGostiju       Int         @map("max_gostiju")
+  dostupnoMesta    Int         @map("dostupno_mesta")
+  kontaktUrl       String      @map("kontakt_url")
+  confidenceScore  Decimal?    @map("confidence_score") @db.Decimal(3, 2)
+  status           OfferStatus @default(pending_review)
+  publishedAt      DateTime?   @map("published_at")
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
+
+  agency Agency  @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  upload Upload  @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+  clicks Click[]
+
+  // Sprečava duplikate pri re-upload-u iste ponude (brief sekcija 5) — ista
+  // agencija/destinacija/datum polaska = ažuriranje postojećeg reda, ne novi.
+  @@unique([agencyId, destinacija, datumPolaska])
+  // Glavni search upit (brief sekcija 5) — priprema za javni sajt, iako taj
+  // deo još čita iz mock podataka (apps/site), ne iz ove tabele.
+  @@index([destinacija, datumPolaska, dostupnoMesta])
+  @@map("offers")
+}
+
+// ipHash — heš IP adrese, ne sirova adresa (GDPR/privatnost); brief eksplicitno
+// traži "ip_hash" kao naziv polja, ne "ip".
+model Click {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  offerId   String   @map("offer_id") @db.Uuid
+  agencyId  String   @map("agency_id") @db.Uuid
+  ipHash    String   @map("ip_hash")
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at")
+  isValid   Boolean  @default(true) @map("is_valid")
+
+  // Restrict, ne Cascade — klikovi su osnova za CPC fakturisanje (brief
+  // sekcija 9); brisanje ponude ne sme tiho da odnese istoriju naplate sa
+  // sobom. Ponude se u normalnom toku ne brišu nego prelaze u status
+  // "expired" (Korak 3) — hard delete offera ostaje retka, superadmin-only
+  // akcija koja mora eksplicitno da reši klikove prvo.
+  offer  Offer  @relation(fields: [offerId], references: [id], onDelete: Restrict)
+  agency Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  @@map("clicks")
 }
 
 // Namerno BEZ FK na actor_id/target_id — subjekat (profil, kasnije agencija,
