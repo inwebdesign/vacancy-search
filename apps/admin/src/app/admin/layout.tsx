@@ -20,6 +20,11 @@ const NAV_ITEMS: { href: string; label: string; roles: Role[] }[] = [
     roles: ["superadmin", "operator", "agency_admin", "agency_user"],
   },
   {
+    href: "/admin/review",
+    label: "Review queue",
+    roles: ["superadmin", "operator"],
+  },
+  {
     href: "/admin/stats",
     label: "Statistika",
     roles: ["superadmin", "operator", "agency_admin"],
