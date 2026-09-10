@@ -30,7 +30,9 @@ export function UploadForm() {
       </button>
       {state?.error && <p className="w-full text-sm text-red-600">{state.error}</p>}
       {state?.success && (
-        <p className="w-full text-sm text-green-600">Upload uspešan.</p>
+        <p className="w-full text-sm text-green-600">
+          {state.summary ?? "Upload uspešan."}
+        </p>
       )}
     </form>
   );

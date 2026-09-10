@@ -5,6 +5,7 @@ import { randomUUID } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/auth/current-profile";
 import { logAudit } from "@/lib/audit/log";
+import { ingestUpload } from "@/lib/offers/ingest";
 
 const BUCKET = "agency-uploads";
 
@@ -15,11 +16,16 @@ const MIME_TO_TIP: Record<string, "excel" | "csv" | "pdf"> = {
   "application/pdf": "pdf",
 };
 
-export type UploadFileState = { error?: string; success?: boolean } | null;
+export type UploadFileState = {
+  error?: string;
+  success?: boolean;
+  summary?: string;
+} | null;
 
-// Faza 2, Korak 2: samo prima i čuva fajl (status "pending") — parsing
-// (Excel/CSV mapiranje, PDF/OCR/LLM ekstrakcija) dolazi u Koraku 3/4, nikad
-// sinhrono ovde u akciji (brief: "parsiranje nikad sinhrono u HTTP request-u").
+// Faza 2, Korak 2: prima i čuva fajl. Korak 3: odmah zatim parsira CSV/Excel
+// (ingestUpload) — SINHRONO, privremeno rešenje dok se ne odluči pravi
+// background-job mehanizam (brief traži async + realtime status, vidi
+// napomenu u lib/offers/ingest.ts). PDF ostaje "pending" do Koraka 4.
 export async function uploadFile(
   _prevState: UploadFileState,
   formData: FormData,
@@ -80,5 +86,33 @@ export async function uploadFile(
   });
 
   revalidatePath("/admin/offers");
-  return { success: true };
+
+  if (tip === "pdf") {
+    return {
+      success: true,
+      summary: "Fajl je primljen. PDF obrada dolazi u sledećem koraku.",
+    };
+  }
+
+  try {
+    const result = await ingestUpload(uploadRow.id);
+    revalidatePath("/admin/offers");
+
+    if (result.missingColumns.length > 0) {
+      return {
+        error: `Fajl je sačuvan, ali obrada nije uspela — nedostaju kolone: ${result.missingColumns.join(", ")}.`,
+      };
+    }
+
+    const parts = [`${result.inserted} ponuda upisano/ažurirano`];
+    if (result.expired > 0) parts.push(`${result.expired} isteklo`);
+    if (result.skippedRows > 0)
+      parts.push(`${result.skippedRows} redova preskočeno (nevalidni podaci)`);
+
+    return { success: true, summary: parts.join(", ") + "." };
+  } catch (err) {
+    return {
+      error: `Fajl je sačuvan, ali obrada nije uspela: ${err instanceof Error ? err.message : "nepoznata greška"}`,
+    };
+  }
 }

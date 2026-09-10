@@ -2,7 +2,9 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 type LogAuditEntry = {
-  actorId: string;
+  // null = sistemski generisan event (npr. automatska rekonsilijacija pri
+  // parsiranju upload-a), ne akcija konkretnog ulogovanog korisnika.
+  actorId: string | null;
   actorEmail: string | null;
   action: string;
   targetTable: string;

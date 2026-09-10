@@ -9,16 +9,22 @@ function displayFileName(path: string) {
   return last.replace(/^[0-9a-f-]{36}-/, "");
 }
 
-const STATUS_LABEL: Record<string, string> = {
+const UPLOAD_STATUS_LABEL: Record<string, string> = {
   pending: "Na čekanju",
   processing: "Obrada u toku",
   completed: "Obrađeno",
   failed: "Neuspešno",
 };
 
-// Faza 2, Korak 2: upload intake. Parsing (Korak 3+) još ne postoji — status
-// ostaje "pending" dok se ne doda. Sadržaj ponuda (offers) dolazi kad Korak 3
-// počne da ih upisuje.
+const OFFER_STATUS_LABEL: Record<string, string> = {
+  pending_review: "Čeka pregled",
+  published: "Objavljeno",
+  rejected: "Odbijeno",
+  expired: "Isteklo",
+};
+
+// Faza 2, Korak 2: upload intake. Korak 3: CSV/Excel parsing sad upisuje
+// offers (sinhrono, privremeno — vidi lib/offers/ingest.ts).
 export default async function OffersPage() {
   const me = await requireRole([
     "superadmin",
@@ -28,11 +34,20 @@ export default async function OffersPage() {
   ]);
 
   const supabase = await createClient();
-  const { data: uploads } = await supabase
-    .from("uploads")
-    .select("id, originalni_fajl_url, tip, status, created_at")
-    .order("created_at", { ascending: false })
-    .limit(50);
+  const [{ data: uploads }, { data: offers }] = await Promise.all([
+    supabase
+      .from("uploads")
+      .select("id, originalni_fajl_url, tip, status, created_at")
+      .order("created_at", { ascending: false })
+      .limit(50),
+    supabase
+      .from("offers")
+      .select(
+        "id, naziv, destinacija, datum_polaska, datum_povratka, cena_eur, status, confidence_score",
+      )
+      .order("updated_at", { ascending: false })
+      .limit(50),
+  ]);
 
   const canUpload = me.role === "agency_admin" || me.role === "agency_user";
 
@@ -42,13 +57,47 @@ export default async function OffersPage() {
       {canUpload && (
         <>
           <p className="mt-1 text-sm text-gray-400">
-            Uploaduj CSV/Excel/PDF fajl sa ponudama — obrada (mapiranje
-            kolona, ekstrakcija) dolazi u sledećem koraku, za sada se samo
-            prima i čuva.
+            Uploaduj CSV/Excel/PDF fajl sa ponudama. CSV/Excel se odmah
+            obrađuje; PDF čeka Korak 4.
           </p>
           <UploadForm />
         </>
       )}
+
+      <h2 className="mt-8 text-lg font-medium">Ponude</h2>
+      <table className="mt-3 w-full text-left text-sm">
+        <thead>
+          <tr className="border-b border-gray-200 text-gray-500">
+            <th className="py-2 pr-4 font-medium">Naziv</th>
+            <th className="py-2 pr-4 font-medium">Destinacija</th>
+            <th className="py-2 pr-4 font-medium">Polazak — povratak</th>
+            <th className="py-2 pr-4 font-medium">Cena</th>
+            <th className="py-2 pr-4 font-medium">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {(offers ?? []).map((o) => (
+            <tr key={o.id} className="border-b border-gray-100">
+              <td className="py-2 pr-4">{o.naziv}</td>
+              <td className="py-2 pr-4">{o.destinacija}</td>
+              <td className="py-2 pr-4 text-gray-500">
+                {o.datum_polaska} — {o.datum_povratka}
+              </td>
+              <td className="py-2 pr-4">{o.cena_eur}€</td>
+              <td className="py-2 pr-4">
+                {OFFER_STATUS_LABEL[o.status] ?? o.status}
+              </td>
+            </tr>
+          ))}
+          {(offers ?? []).length === 0 && (
+            <tr>
+              <td colSpan={5} className="py-4 text-gray-400">
+                Nema ponuda još.
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
 
       <h2 className="mt-8 text-lg font-medium">Istorija upload-a</h2>
       <table className="mt-3 w-full text-left text-sm">
@@ -68,7 +117,7 @@ export default async function OffersPage() {
               </td>
               <td className="py-2 pr-4">{u.tip}</td>
               <td className="py-2 pr-4">
-                {STATUS_LABEL[u.status] ?? u.status}
+                {UPLOAD_STATUS_LABEL[u.status] ?? u.status}
               </td>
               <td className="py-2 pr-4 text-gray-500">
                 {new Date(u.created_at).toLocaleString("sr-Latn-RS")}
