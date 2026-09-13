@@ -14,7 +14,11 @@ Faza 1, Korak 6: middleware za `/admin/*` — **urađeno i provereno** (redirect
 
 Faza 1, Korak 7: role-based navigacija + Tim — **urađeno i provereno** (nav skelet, 6 sekcija filtriranih po ulozi; pune CRUD funkcije na "Tim", ostalo placeholder do Faze 2).
 
-Faza 1, Korak 8: Audit log — **kod u repo-u, čeka se primena nove migracije i test (vidi ispod)**. Loguje Tim akcije (invite/role_change/remove); vidljivo samo superadmin/operator-u.
+Faza 1, Korak 8: Audit log — **urađeno i provereno**. Loguje Tim akcije (invite/role_change/remove); vidljivo samo superadmin/operator-u.
+
+---
+
+Faza 2, Koraci 1-6 (šema, upload, CSV/Excel parsing, PDF/LLM ekstrakcija, review queue, click tracking) — **urađeno i provereno na realnom PDF-u partner agencije**. Vidi sekciju "Faza 2" ispod. Svaki korak je na sopstvenoj feature grani (`claude/faza2-korak1-schema` itd.), još nespojene sa ovom granom.
 
 ## Setup
 
@@ -163,7 +167,7 @@ src/lib/auth/current-profile.ts      getCurrentProfile() — ulogovan user + rol
 src/lib/auth/require-role.ts         requireRole([...]) — redirect ako uloga nije dozvoljena, koristi svaka /admin/* stranica
 src/app/admin/layout.tsx             Top bar (email, uloga, odjava) + nav filtriran po ulozi (samo UI, ne zaštita)
 src/app/admin/agencies/              Placeholder ("Uskoro — Faza 2")
-src/app/admin/offers/                Placeholder
+src/app/admin/offers/                Placeholder u Koraku 7, puna funkcija dodata u Faza 2 Korak 2/3/4 (vidi ispod)
 src/app/admin/stats/                 Placeholder
 src/app/admin/audit-log/             Placeholder u Koraku 7, prava stranica dodata u Koraku 8 (vidi ispod)
 src/app/admin/team/                  Puna funkcija: lista tima, promena uloge, uklanjanje, pozivanje novog člana
@@ -227,6 +231,62 @@ Stavke koje su namerno odložene tokom razgovora o Koraku 7 — ne blokiraju tre
 - **Moderacija ponuda (`offers`, Faza 2)** — nove agencije treba da prođu ručno odobravanje (superadmin) za prvih nekoliko unosa pre nego što dobiju pravo da objavljuju direktno. Predlog mehanizma: polje na `agencies` (npr. `auto_publish: bool`, default `false`) koje kontroliše da li nove ponude te agencije idu odmah u status `active` ili čekaju `pending` odobrenje; superadmin ručno prebacuje agenciju na `auto_publish = true` kad joj veruje (npr. posle X odobrenih unosa bez problema). Dizajn detalja (šta tačno "par publisheva" znači, da li je broj konfigurabilan) nije odrađen.
 - **Rezervisani-ali-neplaćeni datumi (`offer_unavailable_dates`, Faza 2)** — treba `status` kolona (`pending`/`confirmed`), ne samo prost opseg datuma. Poslovna odluka da li `pending` (rezervisano, neplaćeno) blokira termin za druge kupce ili ostaje "dostupno" dok se ne potvrdi plaćanje — nije doneta.
 - **Recenzije (`reviews`, van admin panela)** — dogovoreno da gost ocenjuje posle boravka (ne agencija sama sebe unosi rating). Treba sistem zaštite od lažnih recenzija (npr. dozvoliti ocenu samo gostu koji je stvarno bookirao preko sajta) — dizajn nije urađen, ostaje za kad se gradi javni review flow na `apps/site`.
+- **Full snapshot rekonsilijacija za PDF upload** (Korak 4) — trenutno svaki PDF upload "puno zamenjuje" agencijine aktivne ponude, isto kao CSV/Excel (Korak 3), po doslovnom tekstu brief-a. Nije razmotreno da li ad-hoc "last minute" flajer treba da ističe ponude iz ranijih, nepovezanih upload-a te agencije — moguće da PDF treba drugačije ponašanje (dopuna, ne zamena). Otvoreno za reviziju kad se vidi stvaran obrazac upotrebe.
+- **UI prikaz za `dostupno_mesta = null`** (Korak 4) — PDF cenovnici ne navode broj slobodnih mesta, polje ostaje prazno. Kako se to prikazuje na javnom sajtu (kad taj deo bude povezan) nije odlučeno.
+- **Pravi background job za parsiranje** (Korak 3/4) — parsing i dalje ide sinhrono unutar upload server akcije, privremeno rešenje. Dogovoren mehanizam je Supabase Edge Function + Realtime (bez novog vendora, već u stack-u), ali nije implementiran — CSV/Excel je dovoljno brz da to nije praktičan problem, PDF/LLM ekstrakcija (10-60s) jeste, posebno na Vercel-u gde serverless funkcije imaju vremenski limit.
+
+## Faza 2 — Unos i obrada ponuda
+
+Pregled na običnom jeziku (bez tehničkih detalja): `docs/SAZETAK-KORAKA.md`. Sekcije ispod pretpostavljaju da je Faza 1 gotova.
+
+### Korak 1 — Šema (`uploads`, `offers`, `clicks`)
+
+Nove tabele po brief sekciji 5, sa enum-ima čije tačne vrednosti brief nije precizirao (odluka doneta tokom rada): `upload_type` (excel/csv/pdf), `upload_status` (pending/processing/completed/failed), `offer_status` (pending_review/published/rejected/expired).
+
+RLS po brief sekciji 6: agency_admin/agency_user vide i insertuju `uploads` samo za svoju agenciju; `offers` čitaju samo svoje (superadmin/operator sve), UPDATE (review queue) je superadmin/operator, ne agencija direktno — agencija menja kroz re-upload (pun snapshot), ne editom reda. `agency_user` nema NIKAKAV pristup `clicks` (brief: "bez pristupa fakturisanju"), `agency_admin` vidi svoje. Nema INSERT policy na `offers`/`clicks` ni za jednu ulogu — upisuje ih isključivo `service_role` (parsing pipeline, click-out endpoint).
+
+FK odluke: `uploads.uploaded_by` je `SetNull` (ne `Restrict`) da "Ukloni člana" iz Koraka 7 ne pukne kad obrisan član ima upload istoriju; `clicks.offer_id` je `Restrict` (ne `Cascade`) da brisanje ponude ne odnese CPC naplatnu istoriju sa sobom.
+
+**Šema izmena u Koraku 4** (otkriveno na realnom PDF-u, vidi ispod): `offers.dostupno_mesta` je nullable, unique constraint proširen sa `naziv` (`agency_id, naziv, destinacija, datum_polaska`) jer ista destinacija+datum sad može imati više ponuda (različiti tipovi soba iz PDF cenovnika), `agencies.website` dodat kao fallback za `kontakt_url`.
+
+### Korak 2 — Upload intake
+
+Supabase Storage bucket `agency-uploads` (privatan, 10MB limit, CSV/Excel/PDF mime whitelist) + Storage RLS na `storage.objects`: putanja mora počinjati sa `agency_id` (`{agencyId}/{uuid}-{filename}`), agency_admin/agency_user upload-uju i čitaju samo svoj folder.
+
+`/admin/offers` ima upload formu (agency_admin/agency_user) + tabelu istorije upload-a i ponuda (svi vide, RLS filtrira po agenciji). Upload ide preko korisnikove sopstvene RLS-scoped sesije, ne `service_role`.
+
+### Korak 3 — CSV/Excel parsing
+
+Fuzzy column-mapping (normalizacija + rečnik sinonima, ne pravi Levenshtein) preko `papaparse` (CSV) i `exceljs` (Excel — `xlsx` paket odbačen zbog nezakrpljenih high-severity CVE-ova, prototype pollution + ReDoS). `agencija_id` i `poslednje_azurirano` iz brief-ovog template-a se namerno ne mapiraju.
+
+Red koji ne uspe da parsira sva obavezna polja se ne ubacuje u `offers` (broji se kao skipped) — vidi tech debt iznad.
+
+Rekonsilijacija "punog snapshot-a": svaki uspešno parsiran red se upsert-uje, a ponude te agencije koje su bile aktivne iz prethodnog upload-a ali nisu u ovom prelaze u `expired`.
+
+**Bug otkriven i popravljen**: `uploads.updated_at`/`offers.updated_at` nisu imali DB-level default ni trigger — Prisma-ov `@updatedAt` radi samo kad Prisma Client sam piše, a runtime uvek piše preko Supabase klijenta. Dodat Postgres trigger + `DEFAULT` u posebnoj migraciji.
+
+### Korak 4 — PDF/LLM ekstrakcija
+
+Realan PDF cenovnik partner agencije se pokazao mnogo složeniji od flat CSV template-a: cenovna matrica (destinacija × vila × tip sobe × tip prevoza), ne lista pojedinačnih ponuda — jedan PDF proizvodi desetine ponuda (jedna po kombinaciji), ne jednu po redu.
+
+- **OCR nije implementiran** — prvi partner šalje tekstualne PDF-ove (tekst se selektuje mišem), ne skenove, pa `pdf-parse` direktno vadi tekst. Ako se pojavi partner sa skeniranim PDF-om, ovaj deo pravi grešku ("PDF nema tekstualni sloj") umesto da tiho ne uradi ništa.
+- **Ekstrakcija**: `lib/offers/pdf-extract.ts`, Claude API (`claude-opus-5`, streaming, `max_tokens: 64000` — veliki dokumenti lako prerastu par hiljada tokena izlaza). Model vraća JSON niz ponuda, uz `uncertain: true` na redovima gde je nesiguran (nejasna ćelija, dvosmislen kod sobe...).
+- **Confidence/status**: `uncertain: false` → `published`, `confidence_score: 0.9`; `uncertain: true` → `pending_review`, `confidence_score: 0.5`. Ovo je mesto gde brief-ov princip "sve što ne prođe prag pouzdanosti ide u review queue" stvarno ima efekta (za razliku od Koraka 3, gde CSV/Excel parsing nema prave "nesigurnosti").
+- **`dostupno_mesta`**: uvek `null` za PDF-izvučene ponude — izvor ne navodi broj slobodnih mesta.
+- **`kontakt_url`**: `agencies.website` (fallback `agencies.kontakt`) — PDF cenovnici nemaju link po ponudi, samo opšti kontakt agencije.
+- **Model**: `claude-opus-5` (ne `claude-sonnet-5`) — projektni default za kvalitet ekstrakcije osetljive na tačnost cena.
+
+Testirano na tekstu realnog PDF-a partner agencije (Aqua Travel, last-minute cenovnik za Grčku) — 42 ponude tačno izvučene iz isečka dokumenta, uključujući tačno izvedeni `max_gostiju` iz kodova soba (1/2, 1/3, ¼...) i realnu detekciju nesigurnih redova.
+
+### Korak 5 — Review queue
+
+`/admin/review` (superadmin/operator) — lista svih `pending_review` ponuda preko svih agencija, sa inline editom polja pre odobravanja (operator "uređuje ponude svih agencija"), Sačuvaj/Odobri/Odbij akcije. UPDATE ide preko korisnikove sopstvene RLS-scoped sesije, ne `service_role`.
+
+### Korak 6 — Click tracking
+
+Javna (bez auth) ruta `/go/[offerId]` — brief sekcija 9: "clicks tabela beleži svaki klik". Zapisuje preko `service_role` (anoniman posetilac nema sesiju), 302 redirect na `offer.kontakt_url`. `is_valid = false` za user-agent koji liči na bot/skriptu (regex) ILI ponovljen klik sa iste IP adrese na istu ponudu u poslednjih 30 min.
+
+**Nije ožičeno na `apps/site`** — taj sajt čita mock podatke, ne pravu `offers` tabelu; brief eksplicitno isključuje javni sajt iz scope-a (sekcija 1). Testirano direktno preko URL-a.
 
 ## Sledeći koraci (Faza 1)
 
@@ -237,4 +297,13 @@ Stavke koje su namerno odložene tokom razgovora o Koraku 7 — ne blokiraju tre
 - [x] Korak 5: RLS politike — primenjeno, testirano sa dva `agency_admin` naloga (vidi gore)
 - [x] Korak 6: middleware za `/admin/*` — testirano (vidi gore); MFA enforcement ostaje otvoreno
 - [x] Korak 7: role-based navigacija + Tim — testirano sa sve tri role (vidi gore)
-- [ ] Korak 8: audit log — kod u repo-u, čeka se primena migracije i test (vidi gore)
+- [x] Korak 8: audit log — testirano end-to-end (vidi gore)
+
+## Sledeći koraci (Faza 2)
+
+- [x] Korak 1: šema (`uploads`/`offers`/`clicks` + RLS)
+- [x] Korak 2: upload intake (Storage bucket + forma)
+- [x] Korak 3: CSV/Excel parsing + pun snapshot rekonsilijacija
+- [x] Korak 4: PDF/LLM ekstrakcija (Claude API) — testirano na realnom PDF-u partner agencije
+- [x] Korak 5: review queue
+- [x] Korak 6: click tracking (click-out endpoint, nije ožičeno na `apps/site`)

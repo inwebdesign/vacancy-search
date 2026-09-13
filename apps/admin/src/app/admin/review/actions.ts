@@ -30,7 +30,10 @@ export async function reviewOffer(
   const datumPovratka = String(formData.get("datum_povratka") ?? "");
   const cenaEur = Number(formData.get("cena_eur"));
   const maxGostiju = Number(formData.get("max_gostiju"));
-  const dostupnoMesta = Number(formData.get("dostupno_mesta"));
+  // Nullable — PDF cenovnici (Korak 4) obično ne navode broj slobodnih
+  // mesta. Prazno polje = nepoznato, ne greška.
+  const rawDostupnoMesta = String(formData.get("dostupno_mesta") ?? "").trim();
+  const dostupnoMesta = rawDostupnoMesta === "" ? null : Number(rawDostupnoMesta);
   const kontaktUrl = String(formData.get("kontakt_url") ?? "").trim();
 
   if (
@@ -41,7 +44,7 @@ export async function reviewOffer(
     !kontaktUrl ||
     !Number.isFinite(cenaEur) ||
     !Number.isFinite(maxGostiju) ||
-    !Number.isFinite(dostupnoMesta)
+    (dostupnoMesta !== null && !Number.isFinite(dostupnoMesta))
   ) {
     return { error: "Popuni sva polja ispravno." };
   }

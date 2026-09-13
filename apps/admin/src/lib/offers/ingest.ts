@@ -1,6 +1,8 @@
 import "server-only";
+import { PDFParse } from "pdf-parse";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { parseCsv, parseExcel, type ParsedOffer } from "./parse";
+import { extractOffersFromPdfText, type ExtractedOffer } from "./pdf-extract";
 import { logAudit } from "@/lib/audit/log";
 
 const BUCKET = "agency-uploads";
@@ -41,13 +43,6 @@ export async function ingestUpload(uploadId: string): Promise<IngestSummary> {
     throw new Error(uploadError?.message ?? "Upload nije pronađen.");
   }
 
-  // PDF ide u Korak 4 — ostaje "pending" dok pipeline ne postoji, ne
-  // označava se kao "failed" (to bi bilo pogrešno, ništa još nije ni
-  // pokušano).
-  if (upload.tip === "pdf") {
-    return { inserted: 0, expired: 0, skippedRows: 0, missingColumns: [] };
-  }
-
   await admin.from("uploads").update({ status: "processing" }).eq("id", uploadId);
 
   try {
@@ -58,6 +53,10 @@ export async function ingestUpload(uploadId: string): Promise<IngestSummary> {
       throw new Error(downloadError?.message ?? "Preuzimanje fajla nije uspelo.");
     }
     const buffer = Buffer.from(await fileBlob.arrayBuffer());
+
+    if (upload.tip === "pdf") {
+      return await ingestPdf(admin, upload.agency_id, uploadId, buffer);
+    }
 
     const result =
       upload.tip === "csv" ? await parseCsv(buffer) : await parseExcel(buffer);
@@ -80,7 +79,11 @@ export async function ingestUpload(uploadId: string): Promise<IngestSummary> {
     const expired = await expireStaleOffers(
       admin,
       upload.agency_id,
-      result.rows,
+      result.rows.map((r) => ({
+        naziv: r.naziv,
+        destinacija: r.destinacija,
+        datumPolaska: r.datumPolaska,
+      })),
     );
 
     await admin.from("uploads").update({ status: "completed" }).eq("id", uploadId);
@@ -94,6 +97,99 @@ export async function ingestUpload(uploadId: string): Promise<IngestSummary> {
   } catch (err) {
     await admin.from("uploads").update({ status: "failed" }).eq("id", uploadId);
     throw err;
+  }
+}
+
+// Faza 2, Korak 4: PDF cenovnik -> tekst (pdf-parse, pretpostavlja tekstualni
+// sloj, ne sken — OCR nije implementiran, vidi razgovor) -> Claude API
+// (lib/offers/pdf-extract.ts) -> jedna ponuda po kombinaciji
+// destinacija+vila+tip sobe+tip prevoza. dostupno_mesta ostaje NULL (izvor
+// ga ne navodi, UI prikaz "nepoznato" nije odlučen). kontakt_url dolazi iz
+// agencies.website (fallback agencies.kontakt) jer PDF cenovnici nemaju link
+// po ponudi, samo opšti kontakt agencije.
+//
+// Red koji model označi kao "uncertain" ide u pending_review (confidence
+// 0.5) umesto direktno u published (confidence 0.9) — ovo je mesto gde
+// brief-ov princip "sve što ne prođe prag pouzdanosti ide u review queue"
+// stvarno ima efekta (za razliku od Koraka 3, gde CSV/Excel parsing nema
+// prave "nesigurnosti", samo prođe ili ne prođe).
+async function ingestPdf(
+  admin: ReturnType<typeof createAdminClient>,
+  agencyId: string,
+  uploadId: string,
+  buffer: Buffer,
+): Promise<IngestSummary> {
+  const { data: agency } = await admin
+    .from("agencies")
+    .select("website, kontakt")
+    .eq("id", agencyId)
+    .single();
+  const kontaktUrl = agency?.website || agency?.kontakt || "";
+
+  const parser = new PDFParse({ data: buffer });
+  const { text } = await parser.getText();
+  await parser.destroy();
+  if (!text || text.trim().length < 20) {
+    await admin.from("uploads").update({ status: "failed" }).eq("id", uploadId);
+    return {
+      inserted: 0,
+      expired: 0,
+      skippedRows: 0,
+      missingColumns: ["(PDF nema tekstualni sloj — potreban OCR, nije implementiran)"],
+    };
+  }
+
+  const offers = await extractOffersFromPdfText(text);
+  const now = new Date().toISOString();
+
+  for (const offer of offers) {
+    await upsertPdfOffer(admin, agencyId, uploadId, offer, kontaktUrl, now);
+  }
+
+  const expired = await expireStaleOffers(
+    admin,
+    agencyId,
+    offers.map((o) => ({
+      naziv: o.naziv,
+      destinacija: o.destinacija,
+      datumPolaska: o.datumPolaska,
+    })),
+  );
+
+  await admin.from("uploads").update({ status: "completed" }).eq("id", uploadId);
+
+  return { inserted: offers.length, expired, skippedRows: 0, missingColumns: [] };
+}
+
+async function upsertPdfOffer(
+  admin: ReturnType<typeof createAdminClient>,
+  agencyId: string,
+  uploadId: string,
+  offer: ExtractedOffer,
+  kontaktUrl: string,
+  now: string,
+) {
+  const confident = !offer.uncertain;
+  const { error } = await admin.from("offers").upsert(
+    {
+      agency_id: agencyId,
+      upload_id: uploadId,
+      naziv: offer.naziv,
+      destinacija: offer.destinacija,
+      datum_polaska: offer.datumPolaska,
+      datum_povratka: offer.datumPovratka,
+      cena_eur: offer.cenaEur,
+      max_gostiju: offer.maxGostiju,
+      dostupno_mesta: null,
+      kontakt_url: kontaktUrl,
+      confidence_score: confident ? 0.9 : 0.5,
+      status: confident ? "published" : "pending_review",
+      published_at: confident ? now : null,
+    },
+    { onConflict: "agency_id,naziv,destinacija,datum_polaska" },
+  );
+  if (error) {
+    throw new Error(`Upis ponude "${offer.naziv}" nije uspeo: ${error.message}`);
   }
 }
 
@@ -120,30 +216,34 @@ async function upsertOffer(
       status: "published",
       published_at: now,
     },
-    { onConflict: "agency_id,destinacija,datum_polaska" },
+    { onConflict: "agency_id,naziv,destinacija,datum_polaska" },
   );
   if (error) {
     throw new Error(`Upis ponude "${row.naziv}" nije uspeo: ${error.message}`);
   }
 }
 
+type OfferKey = { naziv: string; destinacija: string; datumPolaska: string };
+
 async function expireStaleOffers(
   admin: ReturnType<typeof createAdminClient>,
   agencyId: string,
-  freshRows: ParsedOffer[],
+  freshRows: OfferKey[],
 ): Promise<number> {
   const freshKeys = new Set(
-    freshRows.map((r) => `${r.destinacija}|${r.datumPolaska}`),
+    freshRows.map((r) => `${r.naziv}|${r.destinacija}|${r.datumPolaska}`),
   );
 
   const { data: existing } = await admin
     .from("offers")
-    .select("id, destinacija, datum_polaska")
+    .select("id, naziv, destinacija, datum_polaska")
     .eq("agency_id", agencyId)
     .in("status", ["published", "pending_review"]);
 
   const toExpire = (existing ?? [])
-    .filter((o) => !freshKeys.has(`${o.destinacija}|${o.datum_polaska}`))
+    .filter(
+      (o) => !freshKeys.has(`${o.naziv}|${o.destinacija}|${o.datum_polaska}`),
+    )
     .map((o) => o.id);
 
   if (toExpire.length === 0) return 0;

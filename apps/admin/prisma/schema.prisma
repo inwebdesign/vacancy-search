@@ -37,6 +37,9 @@ model Agency {
   naziv                String
   pib                  String       @unique
   kontakt              String
+  // Faza 2, Korak 4: fallback za offers.kontaktUrl kad izvor (PDF cenovnik)
+  // nema link po ponudi, samo opšti kontakt agencije.
+  website              String?
   cpcCena              Decimal      @map("cpc_cena") @db.Decimal(10, 2)
   mesecniBudzetKlikova Int          @map("mesecni_budzet_klikova")
   status               AgencyStatus @default(pending)
@@ -134,7 +137,10 @@ model Offer {
   datumPovratka    DateTime    @map("datum_povratka") @db.Date
   cenaEur          Decimal     @map("cena_eur") @db.Decimal(10, 2)
   maxGostiju       Int         @map("max_gostiju")
-  dostupnoMesta    Int         @map("dostupno_mesta")
+  // Nullable — Faza 2, Korak 4: PDF cenovnici obično uopšte ne navode broj
+  // slobodnih mesta, samo cenu po tipu sobe. UI prikaz za "nepoznato" nije
+  // odlučen, ostaje otvoreno.
+  dostupnoMesta    Int?        @map("dostupno_mesta")
   kontaktUrl       String      @map("kontakt_url")
   confidenceScore  Decimal?    @map("confidence_score") @db.Decimal(3, 2)
   status           OfferStatus @default(pending_review)
@@ -147,8 +153,10 @@ model Offer {
   clicks Click[]
 
   // Sprečava duplikate pri re-upload-u iste ponude (brief sekcija 5) — ista
-  // agencija/destinacija/datum polaska = ažuriranje postojećeg reda, ne novi.
-  @@unique([agencyId, destinacija, datumPolaska])
+  // agencija/naziv/destinacija/datum polaska = ažuriranje postojećeg reda, ne
+  // novi. "naziv" je dodat u Koraku 4: ista destinacija+datum može imati više
+  // ponuda (različiti tipovi soba/vila iz PDF cenovnika), naziv ih razlikuje.
+  @@unique([agencyId, naziv, destinacija, datumPolaska])
   // Glavni search upit (brief sekcija 5) — priprema za javni sajt, iako taj
   // deo još čita iz mock podataka (apps/site), ne iz ove tabele.
   @@index([destinacija, datumPolaska, dostupnoMesta])

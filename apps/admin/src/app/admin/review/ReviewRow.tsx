@@ -11,7 +11,7 @@ type Offer = {
   datum_povratka: string;
   cena_eur: number;
   max_gostiju: number;
-  dostupno_mesta: number;
+  dostupno_mesta: number | null;
   kontakt_url: string;
   confidence_score: number | null;
   agencyName: string | null;
@@ -36,7 +36,7 @@ export function ReviewRow({ offer }: { offer: Offer }) {
     datum_povratka: offer.datum_povratka,
     cena_eur: String(offer.cena_eur),
     max_gostiju: String(offer.max_gostiju),
-    dostupno_mesta: String(offer.dostupno_mesta),
+    dostupno_mesta: offer.dostupno_mesta === null ? "" : String(offer.dostupno_mesta),
     kontakt_url: offer.kontakt_url,
   });
   const [pending, startTransition] = useTransition();
@@ -56,11 +56,12 @@ export function ReviewRow({ offer }: { offer: Offer }) {
     });
   }
 
-  function field(name: keyof Fields, type = "text") {
+  function field(name: keyof Fields, type = "text", placeholder?: string) {
     return (
       <input
         type={type}
         value={fields[name]}
+        placeholder={placeholder}
         onChange={(e) => setFields((f) => ({ ...f, [name]: e.target.value }))}
         disabled={pending || done}
         className="w-full rounded border border-gray-300 px-2 py-1 text-sm disabled:opacity-50"
@@ -79,7 +80,9 @@ export function ReviewRow({ offer }: { offer: Offer }) {
       <td className="py-2 pr-2">{field("datum_povratka", "date")}</td>
       <td className="w-20 py-2 pr-2">{field("cena_eur", "number")}</td>
       <td className="w-16 py-2 pr-2">{field("max_gostiju", "number")}</td>
-      <td className="w-16 py-2 pr-2">{field("dostupno_mesta", "number")}</td>
+      <td className="w-16 py-2 pr-2">
+        {field("dostupno_mesta", "number", "nepoznato")}
+      </td>
       <td className="py-2 pr-2">{field("kontakt_url", "url")}</td>
       <td className="py-2 pr-2 text-gray-500">
         {offer.confidence_score ?? "—"}
