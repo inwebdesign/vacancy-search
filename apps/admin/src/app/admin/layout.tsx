@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getCurrentProfile, type Role } from "@/lib/auth/current-profile";
+import { createClient } from "@/lib/supabase/server";
 
 const NAV_ITEMS: { href: string; label: string; roles: Role[] }[] = [
   {
@@ -52,6 +53,23 @@ export default async function AdminLayout({
 
   const links = NAV_ITEMS.filter((item) => item.roles.includes(profile.role));
 
+  // Nudge: ako je agencijski nalog, a naziv agencije još nije popunjen (npr.
+  // nalog kreiran pre nego što je agencija stigla da unese svoje podatke),
+  // podseti je da to uradi na stranici "Agencije" (vidi agencies/page.tsx).
+  let showAgencyNameNudge = false;
+  if (
+    (profile.role === "agency_admin" || profile.role === "agency_user") &&
+    profile.agencyId
+  ) {
+    const supabase = await createClient();
+    const { data: agency } = await supabase
+      .from("agencies")
+      .select("naziv")
+      .eq("id", profile.agencyId)
+      .single();
+    showAgencyNameNudge = !agency?.naziv?.trim();
+  }
+
   return (
     <div className="min-h-screen">
       <header className="flex items-center justify-between border-b border-gray-200 px-6 py-3">
@@ -67,6 +85,15 @@ export default async function AdminLayout({
           </button>
         </form>
       </header>
+      {showAgencyNameNudge && (
+        <div className="border-b border-amber-200 bg-amber-50 px-6 py-2 text-sm text-amber-800">
+          Naziv agencije još nije unet —{" "}
+          <Link href="/admin/agencies" className="font-medium underline">
+            unesi ga ovde
+          </Link>
+          .
+        </div>
+      )}
       <div className="flex">
         <nav className="w-48 shrink-0 border-r border-gray-200 px-4 py-6">
           <ul className="flex flex-col gap-2 text-sm">

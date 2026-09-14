@@ -2,11 +2,23 @@ type PaginationProps = {
   page: number;
   totalPages: number;
   basePath: string;
+  // Ostali aktivni query parametri (pretraga, filteri) koje treba sačuvati
+  // kad se ide na prethodnu/sledeću stranu — prazne vrednosti se izostavljaju.
+  query?: Record<string, string | undefined>;
 };
 
+function buildHref(basePath: string, page: number, query?: PaginationProps["query"]) {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query ?? {})) {
+    if (value) params.set(key, value);
+  }
+  params.set("page", String(page));
+  return `${basePath}?${params.toString()}`;
+}
+
 // Deljena paginacija za admin liste (offers, review). basePath je putanja
-// bez query stringa (npr. "/admin/offers") — dodaje se ?page=N.
-export function Pagination({ page, totalPages, basePath }: PaginationProps) {
+// bez query stringa (npr. "/admin/offers") — dodaje se ?page=N (+ query).
+export function Pagination({ page, totalPages, basePath, query }: PaginationProps) {
   if (totalPages <= 1) return null;
 
   const prevDisabled = page <= 1;
@@ -25,7 +37,7 @@ export function Pagination({ page, totalPages, basePath }: PaginationProps) {
       className="mt-4 flex items-center justify-center gap-4"
     >
       <a
-        href={prevDisabled ? undefined : `${basePath}?page=${page - 1}`}
+        href={prevDisabled ? undefined : buildHref(basePath, page - 1, query)}
         aria-disabled={prevDisabled}
         tabIndex={prevDisabled ? -1 : undefined}
         className={`${baseBtn} ${prevDisabled ? disabledBtn : activeBtn}`}
@@ -37,7 +49,7 @@ export function Pagination({ page, totalPages, basePath }: PaginationProps) {
         <span className="font-semibold text-gray-900">{totalPages}</span>
       </span>
       <a
-        href={nextDisabled ? undefined : `${basePath}?page=${page + 1}`}
+        href={nextDisabled ? undefined : buildHref(basePath, page + 1, query)}
         aria-disabled={nextDisabled}
         tabIndex={nextDisabled ? -1 : undefined}
         className={`${baseBtn} ${nextDisabled ? disabledBtn : activeBtn}`}

@@ -23,7 +23,6 @@ type Fields = {
   datum_polaska: string;
   datum_povratka: string;
   cena_eur: string;
-  max_gostiju: string;
   dostupno_mesta: string;
   kontakt_url: string;
 };
@@ -35,7 +34,6 @@ export function ReviewRow({ offer }: { offer: Offer }) {
     datum_polaska: offer.datum_polaska,
     datum_povratka: offer.datum_povratka,
     cena_eur: String(offer.cena_eur),
-    max_gostiju: String(offer.max_gostiju),
     dostupno_mesta: offer.dostupno_mesta === null ? "" : String(offer.dostupno_mesta),
     kontakt_url: offer.kontakt_url,
   });
@@ -79,7 +77,9 @@ export function ReviewRow({ offer }: { offer: Offer }) {
       <td className="py-2 pr-2">{field("datum_polaska", "date")}</td>
       <td className="py-2 pr-2">{field("datum_povratka", "date")}</td>
       <td className="w-20 py-2 pr-2">{field("cena_eur", "number")}</td>
-      <td className="w-16 py-2 pr-2">{field("max_gostiju", "number")}</td>
+      <td className="w-16 py-2 pr-2 text-gray-500" title="Izvedeno iz šifre sobe u nazivu — nije editabilno (tech debt: možda vratiti kao editabilno)">
+        {offer.max_gostiju}
+      </td>
       <td className="w-16 py-2 pr-2">
         {field("dostupno_mesta", "number", "nepoznato")}
       </td>

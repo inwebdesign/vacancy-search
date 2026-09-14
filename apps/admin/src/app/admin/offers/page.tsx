@@ -1,8 +1,18 @@
 import { requireRole } from "@/lib/auth/require-role";
 import { createClient } from "@/lib/supabase/server";
 import { Pagination } from "@/components/Pagination";
+import { FilterBar } from "@/components/FilterBar";
+import { buildOfferSearchOr } from "@/lib/search-filter";
 import { UploadForm } from "./UploadForm";
 import { OfferStatusControl } from "./OfferStatusControl";
+
+const STATUS_OPTIONS = [
+  { value: "pending_review", label: "Čeka pregled" },
+  { value: "published", label: "Objavljeno" },
+  { value: "paused", label: "Pauzirano" },
+  { value: "rejected", label: "Odbijeno" },
+  { value: "expired", label: "Isteklo" },
+];
 
 // Path format je {agencyId}/{uuid}-{filename} (vidi actions.ts) — skida
 // prefiks agencije i uuid da prikaže samo originalno ime fajla.
@@ -25,7 +35,12 @@ const PAGE_SIZE = 50;
 export default async function OffersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{
+    page?: string;
+    q?: string;
+    status?: string;
+    agency?: string;
+  }>;
 }) {
   const me = await requireRole([
     "superadmin",
@@ -34,12 +49,50 @@ export default async function OffersPage({
     "agency_user",
   ]);
 
-  const { page: pageParam } = await searchParams;
+  const isStaff = me.role === "superadmin" || me.role === "operator";
+
+  const {
+    page: pageParam,
+    q,
+    status,
+    agency: agencyParam,
+  } = await searchParams;
   const page = Math.max(1, Number(pageParam) || 1);
   const from = (page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
+  const query = q?.trim() || undefined;
+  // Agency filter je smislen samo za staff (agencija već vidi samo sebe
+  // preko RLS-a) — ignoriši parametar ako ga pošalje agencijski nalog.
+  const agencyFilter = isStaff ? agencyParam?.trim() || undefined : undefined;
 
   const supabase = await createClient();
+
+  // Agencije se učitavaju pre offers upita (staff dropdown filter, i da bi
+  // pretraga po tekstu mogla i naziv agencije da poklopi — vidi
+  // buildOfferSearchOr). Za agencijski nalog nema smisla: RLS ga već svodi
+  // na jednu jedinu agenciju.
+  const { data: agencies } = isStaff
+    ? await supabase.from("agencies").select("id, naziv").order("naziv")
+    : { data: null };
+  const matchingAgencyIds =
+    query && agencies
+      ? agencies
+          .filter((a) => a.naziv.toLowerCase().includes(query.toLowerCase()))
+          .map((a) => a.id)
+      : [];
+
+  let offersQuery = supabase
+    .from("offers")
+    .select(
+      "id, naziv, destinacija, datum_polaska, datum_povratka, cena_eur, status, confidence_score, dostupno_mesta",
+      { count: "exact" },
+    )
+    .order("updated_at", { ascending: false })
+    .range(from, to);
+  if (query) offersQuery = offersQuery.or(buildOfferSearchOr(query, matchingAgencyIds));
+  if (status) offersQuery = offersQuery.eq("status", status);
+  if (agencyFilter) offersQuery = offersQuery.eq("agency_id", agencyFilter);
+
   const [{ data: uploads }, { data: offers, count: offersCount }] =
     await Promise.all([
       supabase
@@ -47,14 +100,7 @@ export default async function OffersPage({
         .select("id, originalni_fajl_url, tip, status, created_at")
         .order("created_at", { ascending: false })
         .limit(50),
-      supabase
-        .from("offers")
-        .select(
-          "id, naziv, destinacija, datum_polaska, datum_povratka, cena_eur, status, confidence_score, dostupno_mesta",
-          { count: "exact" },
-        )
-        .order("updated_at", { ascending: false })
-        .range(from, to),
+      offersQuery,
     ]);
 
   const totalPages = Math.max(1, Math.ceil((offersCount ?? 0) / PAGE_SIZE));
@@ -81,6 +127,14 @@ export default async function OffersPage({
           </span>
         )}
       </h2>
+      <FilterBar
+        basePath="/admin/offers"
+        q={query}
+        status={status}
+        statusOptions={STATUS_OPTIONS}
+        agencyId={agencyFilter}
+        agencies={isStaff ? (agencies ?? []) : undefined}
+      />
       <table className="mt-3 w-full text-left text-sm">
         <thead>
           <tr className="border-b border-gray-200 text-gray-500">
@@ -119,7 +173,12 @@ export default async function OffersPage({
         </tbody>
       </table>
 
-      <Pagination page={page} totalPages={totalPages} basePath="/admin/offers" />
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        basePath="/admin/offers"
+        query={{ q: query, status, agency: agencyFilter }}
+      />
 
       <h2 className="mt-8 text-lg font-medium">Istorija upload-a</h2>
       <table className="mt-3 w-full text-left text-sm">

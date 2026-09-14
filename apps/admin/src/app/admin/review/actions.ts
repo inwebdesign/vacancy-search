@@ -29,7 +29,10 @@ export async function reviewOffer(
   const datumPolaska = String(formData.get("datum_polaska") ?? "");
   const datumPovratka = String(formData.get("datum_povratka") ?? "");
   const cenaEur = Number(formData.get("cena_eur"));
-  const maxGostiju = Number(formData.get("max_gostiju"));
+  // max_gostiju namerno nije editabilno u review-u (izvedeno iz šifre sobe u
+  // nazivu, npr. "1/4 STD" — slobodna izmena bi mogla da ga rastavi od
+  // naziva; tech debt: možda vratiti kao editabilno ako se pokaže potrebno,
+  // vidi README).
   // Nullable — PDF cenovnici (Korak 4) obično ne navode broj slobodnih
   // mesta. Prazno polje = nepoznato, ne greška.
   const rawDostupnoMesta = String(formData.get("dostupno_mesta") ?? "").trim();
@@ -43,7 +46,6 @@ export async function reviewOffer(
     !datumPovratka ||
     !kontaktUrl ||
     !Number.isFinite(cenaEur) ||
-    !Number.isFinite(maxGostiju) ||
     (dostupnoMesta !== null && !Number.isFinite(dostupnoMesta))
   ) {
     return { error: "Popuni sva polja ispravno." };
@@ -55,7 +57,6 @@ export async function reviewOffer(
     datum_polaska: datumPolaska,
     datum_povratka: datumPovratka,
     cena_eur: cenaEur,
-    max_gostiju: maxGostiju,
     dostupno_mesta: dostupnoMesta,
     kontakt_url: kontaktUrl,
   };
