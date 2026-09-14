@@ -1,6 +1,8 @@
 import { requireRole } from "@/lib/auth/require-role";
 import { createClient } from "@/lib/supabase/server";
 import { Pagination } from "@/components/Pagination";
+import { FilterBar } from "@/components/FilterBar";
+import { buildOrIlike } from "@/lib/search-filter";
 import { ReviewRow } from "./ReviewRow";
 
 const PAGE_SIZE = 50;
@@ -11,17 +13,20 @@ const PAGE_SIZE = 50;
 export default async function ReviewPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ page?: string; q?: string; agency?: string }>;
 }) {
   await requireRole(["superadmin", "operator"]);
 
-  const { page: pageParam } = await searchParams;
+  const { page: pageParam, q, agency: agencyParam } = await searchParams;
   const page = Math.max(1, Number(pageParam) || 1);
   const from = (page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
+  const query = q?.trim() || undefined;
+  const agencyFilter = agencyParam?.trim() || undefined;
 
   const supabase = await createClient();
-  const { data: offers, count: offersCount } = await supabase
+
+  let offersQuery = supabase
     .from("offers")
     .select(
       "id, naziv, destinacija, datum_polaska, datum_povratka, cena_eur, max_gostiju, dostupno_mesta, kontakt_url, confidence_score, agencies(naziv)",
@@ -30,6 +35,14 @@ export default async function ReviewPage({
     .eq("status", "pending_review")
     .order("created_at", { ascending: true })
     .range(from, to);
+  if (query) offersQuery = offersQuery.or(buildOrIlike(query, ["naziv", "destinacija"]));
+  if (agencyFilter) offersQuery = offersQuery.eq("agency_id", agencyFilter);
+
+  const [{ data: offers, count: offersCount }, { data: agencies }] =
+    await Promise.all([
+      offersQuery,
+      supabase.from("agencies").select("id, naziv").order("naziv"),
+    ]);
 
   const totalPages = Math.max(1, Math.ceil((offersCount ?? 0) / PAGE_SIZE));
 
@@ -47,6 +60,12 @@ export default async function ReviewPage({
         Ponude koje čekaju ručnu potvrdu — izmeni pre odobravanja ako treba,
         pa odobri ili odbij.
       </p>
+      <FilterBar
+        basePath="/admin/review"
+        q={query}
+        agencyId={agencyFilter}
+        agencies={agencies ?? []}
+      />
       <div className="mt-4 overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead>
@@ -90,7 +109,12 @@ export default async function ReviewPage({
         </table>
       </div>
 
-      <Pagination page={page} totalPages={totalPages} basePath="/admin/review" />
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        basePath="/admin/review"
+        query={{ q: query, agency: agencyFilter }}
+      />
     </div>
   );
 }
