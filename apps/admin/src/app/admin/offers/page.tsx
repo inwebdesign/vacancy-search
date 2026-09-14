@@ -2,6 +2,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import { createClient } from "@/lib/supabase/server";
 import { Pagination } from "@/components/Pagination";
 import { UploadForm } from "./UploadForm";
+import { OfferStatusControl } from "./OfferStatusControl";
 
 // Path format je {agencyId}/{uuid}-{filename} (vidi actions.ts) — skida
 // prefiks agencije i uuid da prikaže samo originalno ime fajla.
@@ -15,13 +16,6 @@ const UPLOAD_STATUS_LABEL: Record<string, string> = {
   processing: "Obrada u toku",
   completed: "Obrađeno",
   failed: "Neuspešno",
-};
-
-const OFFER_STATUS_LABEL: Record<string, string> = {
-  pending_review: "Čeka pregled",
-  published: "Objavljeno",
-  rejected: "Odbijeno",
-  expired: "Isteklo",
 };
 
 const PAGE_SIZE = 50;
@@ -56,7 +50,7 @@ export default async function OffersPage({
       supabase
         .from("offers")
         .select(
-          "id, naziv, destinacija, datum_polaska, datum_povratka, cena_eur, status, confidence_score",
+          "id, naziv, destinacija, datum_polaska, datum_povratka, cena_eur, status, confidence_score, dostupno_mesta",
           { count: "exact" },
         )
         .order("updated_at", { ascending: false })
@@ -107,7 +101,11 @@ export default async function OffersPage({
               </td>
               <td className="py-2 pr-4">{o.cena_eur}€</td>
               <td className="py-2 pr-4">
-                {OFFER_STATUS_LABEL[o.status] ?? o.status}
+                <OfferStatusControl
+                  offerId={o.id}
+                  status={o.status}
+                  dostupnoMesta={o.dostupno_mesta}
+                />
               </td>
             </tr>
           ))}

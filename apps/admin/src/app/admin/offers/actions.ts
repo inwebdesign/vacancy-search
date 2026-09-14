@@ -113,3 +113,91 @@ export async function uploadFile(
     };
   }
 }
+
+export type OfferActionState = { error?: string; success?: boolean } | null;
+
+// Pauziranje/reaktiviranje već objavljene ponude — dozvoljeno i agenciji (za
+// svoju) i timu (za bilo koju). Uloga + granica na koje redove/kolone smeju
+// da se menjaju je stvarna granica na nivou baze (RLS policy
+// offers_update_agency_own + trigger offers_agency_edit_scope, vidi
+// migraciju 20260914100001) — ova provera je samo rana UX povratna
+// informacija, ne oslanjamo se na nju kao na bezbednosnu granicu.
+export async function toggleOfferPause(
+  offerId: string,
+  action: "pause" | "resume",
+): Promise<OfferActionState> {
+  const me = await getCurrentProfile();
+  if (
+    !me ||
+    !["superadmin", "operator", "agency_admin", "agency_user"].includes(
+      me.role,
+    )
+  ) {
+    return { error: "Nemate dozvolu za ovu akciju." };
+  }
+
+  const newStatus = action === "pause" ? "paused" : "published";
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("offers")
+    .update({ status: newStatus })
+    .eq("id", offerId);
+  if (error) {
+    return { error: `Izmena statusa nije uspela: ${error.message}` };
+  }
+
+  await logAudit({
+    actorId: me.userId,
+    actorEmail: me.email,
+    action: `offer.${action}`,
+    targetTable: "offers",
+    targetId: offerId,
+    diff: { status: newStatus },
+  });
+
+  revalidatePath("/admin/offers");
+  return { success: true };
+}
+
+// Izmena dostupno_mesta ("kapacitet") — isto pravilo kao pauza, vidi gore.
+export async function updateOfferCapacity(
+  offerId: string,
+  dostupnoMesta: number | null,
+): Promise<OfferActionState> {
+  const me = await getCurrentProfile();
+  if (
+    !me ||
+    !["superadmin", "operator", "agency_admin", "agency_user"].includes(
+      me.role,
+    )
+  ) {
+    return { error: "Nemate dozvolu za ovu akciju." };
+  }
+  if (
+    dostupnoMesta !== null &&
+    (!Number.isFinite(dostupnoMesta) || dostupnoMesta < 0)
+  ) {
+    return { error: "Broj mesta mora biti pozitivan broj ili prazno." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("offers")
+    .update({ dostupno_mesta: dostupnoMesta })
+    .eq("id", offerId);
+  if (error) {
+    return { error: `Izmena nije uspela: ${error.message}` };
+  }
+
+  await logAudit({
+    actorId: me.userId,
+    actorEmail: me.email,
+    action: "offer.update_capacity",
+    targetTable: "offers",
+    targetId: offerId,
+    diff: { dostupno_mesta: dostupnoMesta },
+  });
+
+  revalidatePath("/admin/offers");
+  return { success: true };
+}

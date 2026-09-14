@@ -118,9 +118,14 @@ model Upload {
 // "expired" se koristi i za rekonsilijaciju punog snapshot-a (Korak 3) — ponuda
 // koja je postojala iz prethodnog upload-a te agencije, ali nije prisutna u
 // najnovijem, prelazi u expired umesto da se briše (audit trag).
+// "paused" dodat naknadno (van brief-a) — agencija privremeno skida svoju
+// već objavljenu ponudu sa sajta (npr. popunjeni kapaciteti) bez gubljenja
+// podataka i bez čekanja na tim; različito od "expired" (automatska
+// rekonsilijacija) i "rejected" (trajna odluka tima o lošim podacima).
 enum OfferStatus {
   pending_review
   published
+  paused
   rejected
   expired
 
