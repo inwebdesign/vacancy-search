@@ -2,7 +2,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import { createClient } from "@/lib/supabase/server";
 import { Pagination } from "@/components/Pagination";
 import { FilterBar } from "@/components/FilterBar";
-import { buildOrIlike } from "@/lib/search-filter";
+import { buildOfferSearchOr } from "@/lib/search-filter";
 import { UploadForm } from "./UploadForm";
 import { OfferStatusControl } from "./OfferStatusControl";
 
@@ -67,6 +67,20 @@ export default async function OffersPage({
 
   const supabase = await createClient();
 
+  // Agencije se učitavaju pre offers upita (staff dropdown filter, i da bi
+  // pretraga po tekstu mogla i naziv agencije da poklopi — vidi
+  // buildOfferSearchOr). Za agencijski nalog nema smisla: RLS ga već svodi
+  // na jednu jedinu agenciju.
+  const { data: agencies } = isStaff
+    ? await supabase.from("agencies").select("id, naziv").order("naziv")
+    : { data: null };
+  const matchingAgencyIds =
+    query && agencies
+      ? agencies
+          .filter((a) => a.naziv.toLowerCase().includes(query.toLowerCase()))
+          .map((a) => a.id)
+      : [];
+
   let offersQuery = supabase
     .from("offers")
     .select(
@@ -75,11 +89,11 @@ export default async function OffersPage({
     )
     .order("updated_at", { ascending: false })
     .range(from, to);
-  if (query) offersQuery = offersQuery.or(buildOrIlike(query, ["naziv", "destinacija"]));
+  if (query) offersQuery = offersQuery.or(buildOfferSearchOr(query, matchingAgencyIds));
   if (status) offersQuery = offersQuery.eq("status", status);
   if (agencyFilter) offersQuery = offersQuery.eq("agency_id", agencyFilter);
 
-  const [{ data: uploads }, { data: offers, count: offersCount }, { data: agencies }] =
+  const [{ data: uploads }, { data: offers, count: offersCount }] =
     await Promise.all([
       supabase
         .from("uploads")
@@ -87,9 +101,6 @@ export default async function OffersPage({
         .order("created_at", { ascending: false })
         .limit(50),
       offersQuery,
-      isStaff
-        ? supabase.from("agencies").select("id, naziv").order("naziv")
-        : Promise.resolve({ data: null }),
     ]);
 
   const totalPages = Math.max(1, Math.ceil((offersCount ?? 0) / PAGE_SIZE));

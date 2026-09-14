@@ -18,3 +18,18 @@ export function buildOrIlike(term: string, columns: string[]): string {
     : pattern;
   return columns.map((c) => `${c}.ilike.${value}`).join(",");
 }
+
+// Pretraga po nazivu agencije ide preko posebnog upita na agencies (ne
+// preko PostgREST cross-table .or() na embedded resursu — to zahteva
+// !inner join i ume nepredvidivo da se ponaša) — id-jevi agencija koje
+// poklapaju termin se ubace kao dodatan agency_id.in.(...) uslov u isti
+// .or() koji već pretražuje naziv/destinaciju ponude. UUID-ovi dolaze iz
+// naše sopstvene baze (ne od korisnika), sigurni su za direktnu ugradnju.
+export function buildOfferSearchOr(
+  term: string,
+  matchingAgencyIds: string[],
+): string {
+  const base = buildOrIlike(term, ["naziv", "destinacija"]);
+  if (matchingAgencyIds.length === 0) return base;
+  return `${base},agency_id.in.(${matchingAgencyIds.join(",")})`;
+}

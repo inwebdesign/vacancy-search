@@ -2,7 +2,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import { createClient } from "@/lib/supabase/server";
 import { Pagination } from "@/components/Pagination";
 import { FilterBar } from "@/components/FilterBar";
-import { buildOrIlike } from "@/lib/search-filter";
+import { buildOfferSearchOr } from "@/lib/search-filter";
 import { ReviewRow } from "./ReviewRow";
 
 const PAGE_SIZE = 50;
@@ -26,6 +26,18 @@ export default async function ReviewPage({
 
   const supabase = await createClient();
 
+  // Agencije se učitavaju pre offers upita — treba nam spisak i za dropdown
+  // filter i da bi tekstualna pretraga mogla i naziv agencije da poklopi.
+  const { data: agencies } = await supabase
+    .from("agencies")
+    .select("id, naziv")
+    .order("naziv");
+  const matchingAgencyIds = query
+    ? (agencies ?? [])
+        .filter((a) => a.naziv.toLowerCase().includes(query.toLowerCase()))
+        .map((a) => a.id)
+    : [];
+
   let offersQuery = supabase
     .from("offers")
     .select(
@@ -35,14 +47,10 @@ export default async function ReviewPage({
     .eq("status", "pending_review")
     .order("created_at", { ascending: true })
     .range(from, to);
-  if (query) offersQuery = offersQuery.or(buildOrIlike(query, ["naziv", "destinacija"]));
+  if (query) offersQuery = offersQuery.or(buildOfferSearchOr(query, matchingAgencyIds));
   if (agencyFilter) offersQuery = offersQuery.eq("agency_id", agencyFilter);
 
-  const [{ data: offers, count: offersCount }, { data: agencies }] =
-    await Promise.all([
-      offersQuery,
-      supabase.from("agencies").select("id, naziv").order("naziv"),
-    ]);
+  const { data: offers, count: offersCount } = await offersQuery;
 
   const totalPages = Math.max(1, Math.ceil((offersCount ?? 0) / PAGE_SIZE));
 
@@ -92,9 +100,9 @@ export default async function ReviewPage({
                   agencyName:
                     (
                       o as unknown as {
-                        agencies?: { naziv: string }[] | null;
+                        agencies?: { naziv: string } | null;
                       }
-                    ).agencies?.[0]?.naziv ?? null,
+                    ).agencies?.naziv ?? null,
                 }}
               />
             ))}
