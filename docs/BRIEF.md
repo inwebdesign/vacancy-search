@@ -34,16 +34,20 @@ Ova pravila su rezultat analize pravnog rizika i moraju ostati netaknuta kroz sv
 |---|---|---|
 | Faza 0 | Pravna priprema (van koda) | Gotovo |
 | **Faza 1** | Infrastruktura: auth, role, prazan dashboard skelet | **Gotovo — vidi sekciju 7** |
-| Faza 2 | Review queue, upload flow, prve ponude u bazi | Nije počela |
-| Faza 3 | PDF/Excel parsing pipeline sa LLM ekstrakcijom, CPC tracking | Nije počela |
-| Faza 4 | Proširenje unutar Srbije, premium sloj, data insights | Nije počela |
+| **Faza 2** | Review queue, upload flow, prve ponude u bazi | **Gotovo — vidi sekciju 8** |
+| **Faza 3** | PDF/Excel parsing pipeline sa LLM ekstrakcijom, CPC tracking | **Gotovo — urađeno zajedno sa Fazom 2, vidi sekciju 8** |
+| Faza 4 | Proširenje unutar Srbije, premium sloj, data insights | Sledeća na redu — nije počela |
 | Faza 5 | Regionalna ekspanzija | Nije počela |
+
+**Napomena o brojanju faza**: originalni plan je razdvajao Fazu 2 (review queue/upload flow) od Faze 3 (PDF/LLM parsing + CPC tracking) kao dva odvojena koraka. U praksi su urađene zajedno, pod jednim radnim nazivom "Faza 2" (Koraci 1-6) — CSV/Excel parsing, PDF/LLM ekstrakcija i click tracking (CPC osnova) su implementirani u istoj seriji feature grana i spojeni u `main` odjednom. Ostatak dokumenta i dalje koristi originalnu numeraciju (Faza 2 vs Faza 3) radi konzistentnosti sa ostatkom brief-a, ali status oba reda je identičan.
 
 ## 5. Šema baze (ciljna, kompletna — gradi se postepeno)
 
 ```
 agencies
   id, naziv, pib, kontakt, cpc_cena, mesecni_budzet_klikova, status
+  -- website dodat naknadno (Faza 2, Korak 4) — fallback za offers.kontakt_url kad
+  --   izvor (PDF cenovnik) nema link po ponudi, samo opšti kontakt agencije
 
 profiles
   id (ref auth.users), agency_id, role, created_at
@@ -57,8 +61,13 @@ offers
   datum_polaska, datum_povratka, cena_eur, max_gostiju,
   dostupno_mesta, kontakt_url, confidence_score, status,
   published_at, updated_at
-  -- unique constraint: (agency_id, destinacija, datum_polaska) — sprečava duplikate pri re-upload-u
-  -- status enum: pending_review, published, rejected, expired
+  -- unique constraint: (agency_id, naziv, destinacija, datum_polaska) — "naziv" dodat
+  --   naknadno (Faza 2, Korak 4): ista destinacija+datum polaska može imati više
+  --   ponuda iz istog PDF cenovnika (različiti tipovi soba/vila), naziv ih razlikuje
+  -- dostupno_mesta je nullable — PDF cenovnici obično ne navode broj slobodnih mesta
+  -- status enum: pending_review, published, paused, rejected, expired
+  --   "paused" dodat naknadno, van originalnog plana — agencija privremeno skida
+  --   svoju objavljenu ponudu sa sajta bez gubljenja podataka (npr. popunjen kapacitet)
 
 clicks
   id, offer_id, agency_id, ip_hash, user_agent, created_at, is_valid
@@ -86,7 +95,7 @@ Indeksi: `(destinacija, datum_polaska, dostupno_mesta)` na `offers` — glavni s
 
 Prava se implementiraju kao Postgres RLS politike po tabeli (select/insert/update/delete odvojeno), testirane sa realnim tokenom svake role pre puštanja u rad. UI-level provere (sakrivanje dugmadi) su dodatna pogodnost, ne sigurnosna granica.
 
-## 7. Faza 1 — detaljan plan (trenutna faza)
+## 7. Faza 1 — detaljan plan (gotovo)
 
 Cilj: siguran, radan temelj bez ijednog feature-a vidljivog agencijama.
 
@@ -101,38 +110,54 @@ Cilj: siguran, radan temelj bez ijednog feature-a vidljivog agencijama.
 
 **Kriterijum završetka Faze 1 — ispunjen**: prijava sa tri realna naloga (superadmin, dva agency_admin u različitim agencijama) testirana, svaki vidi svoj deo navigacije, RLS testirano sa realnim tokenima (ne pretpostavljeno) da sprečava unakrsni pristup, zaštićena `/admin` stranica postoji i ispisuje ulogu. Nijedan red iz Excel/PDF fajla još ne postoji u bazi — Faza 2 nije počela.
 
-## 8. Faza 2 — Data ingestion (pregled za kasnije, ne graditi sad)
+## 8. Faza 2 i Faza 3 — Data ingestion, PDF/LLM ekstrakcija, CPC tracking (gotovo)
 
-Kad Faza 1 bude gotova, sledeći sloj je unos podataka. Beleška unapred da arhitektura Faze 1 ne bude u sukobu:
+Pun tehnički opis: `apps/admin/README.md` (sekcija "Faza 2"). Opis na običnom jeziku, bez tehničkih detalja: `docs/SAZETAK-KORAKA.md`. Ispod je samo pregled šta je urađeno u odnosu na originalni plan i gde se plan odstupio.
 
-- Agencije šalju Excel/CSV (strukturiran template — kolone: `agencija_id`, `naziv_aranzmana`, `destinacija`, `datum_polaska`, `datum_povratka`, `cena_po_osobi_eur`, `max_gostiju`, `dostupno_mesta`, `kontakt_url`, `poslednje_azurirano`) ili PDF (nestrukturisan, prva partner-agencija tako šalje ažuriranja).
-- **Princip: agenciji se nikad ne vraća fajl na ispravku.** Sistem prima šta god pošalju, pokušava automatsku ekstrakciju, i sve što ne prođe prag pouzdanosti ide u internu review queue (operator/superadmin rola) — ne nazad agenciji.
-- Excel/CSV: fuzzy column-mapping (rečnik sinonima kolona).
-- PDF: detekcija da li ima tekstualni sloj (direktna ekstrakcija) ili je sken (OCR sa podrškom za srpsku ćirilicu prvo, pa ekstrakcija). Sirovi tekst ide kroz LLM sa strukturiranim JSON izlazom (ista šema kao Excel kolone), svako polje nosi confidence score.
-- "Profil agencije" — kad se format agencije uspešno mapira jednom, mapping se pamti da se izbegne skup LLM poziv za svaki naredni upload istog formata.
-- Upload je uvek pun snapshot (zamenjuje prethodni), ne inkrementalni dodatak.
-- Parsiranje nikad sinhrono u HTTP request-u — upload odmah vraća `pending` status, obrada ide u background job, status se ažurira preko realtime subscription-a.
+**Urađeno kako je planirano:**
+- Agencije šalju Excel/CSV ili PDF; oba puta idu kroz isti `offers` model.
+- Princip "nikad se ne vraća fajl agenciji" — poštovan za PDF/LLM putanju: sve ispod praga pouzdanosti ide u internu review queue (`/admin/review`, operator/superadmin), ne nazad agenciji.
+- Excel/CSV: fuzzy column-mapping (rečnik sinonima kolona, `papaparse` + `exceljs`).
+- PDF: sirovi tekst ide kroz LLM (Claude API) sa strukturiranim JSON izlazom, svako polje nosi `confidence_score`; ispod praga ide u review queue kao `pending_review`, iznad praga se objavljuje direktno kao `published`.
+- Upload je pun snapshot (zamenjuje prethodni) — ponude koje nisu u novom upload-u prelaze u `expired`, ne brišu se (audit trag).
+- `clicks` tabela + click-out endpoint (`/go/[offerId]`) beleže svaki klik sa filtriranjem botova/duplikata (`is_valid`) — osnova za CPC fakturisanje iz sekcije 9.
+
+**Odstupanja od plana:**
+- **OCR nije implementiran.** Ako PDF nema tekstualni sloj (skeniran dokument), sistem javlja grešku umesto tihe automatske obrade — princip "nikad se ne vraća fajl" je time delimično narušen za taj slučaj, jer trenutno nema alternative osim da neko ručno prekuca podatke.
+- **"Profil agencije" caching nije implementiran.** Svaki PDF upload ide kroz pun LLM poziv — nema pamćenja mapping-a po agenciji da se izbegne ponovni trošak, kako je plan predviđao.
+- **Parsiranje je i dalje sinhrono**, ne background job + realtime kako je plan predviđao. Dogovoren mehanizam (Supabase Edge Function + Realtime) nije implementiran — CSV/Excel je dovoljno brz da to nije praktičan problem, PDF/LLM ekstrakcija (10-60s) jeste, posebno na Vercel-u gde serverless funkcije imaju vremenski limit. Vidi tech debt u `apps/admin/README.md`.
+- **CSV/Excel redovi koji ne prođu validaciju se tiho preskaču** (broje se kao "skipped"), ne idu u review queue kao kod PDF-a — princip "sve ispod praga ide u review" je dosledno sproveden samo za PDF/LLM putanju.
+- **Excel/CSV template kolone**: `agencija_id` i `poslednje_azurirano` iz originalnog template-a se namerno ne mapiraju (agencija dolazi iz prijavljene sesije, ne iz sadržaja fajla; nema odgovarajuće kolone u bazi za "poslednje ažurirano" van `created_at`/`updated_at`).
+- **Unique constraint na `offers` proširen sa `naziv`** — vidi napomenu u sekciji 5. Otkriveno tek na realnom PDF cenovniku partner agencije (pricing matrica destinacija × vila × tip sobe × tip prevoza), ne u originalnom planu.
+
+**Dodato van plana:**
+- Pauziranje/reaktiviranje već objavljene ponude — agencija sama upravlja svojim kapacitetom (`paused` status, vidi sekciju 5) bez čekanja na tim.
+- Agencija sama unosi/menja naziv, kontakt i website svoje agencije (do sad ovo nije imalo nikakvu UI putanju sem ručnog upisa u bazu).
+- Filteri (pretraga po nazivu/destinaciji/agenciji, status) + paginacija na `/admin/offers` i `/admin/review` — nužno pošto je jedan realan PDF cenovnik proizveo 150+ ponuda.
 
 ## 9. Prihodni model (za kasniju CPC implementaciju)
 
 - CPC fiksna cena po agenciji na startu (nema aukcije dok nema dovoljno oglašivača po istoj destinaciji) — okvirno 0.10-0.20€ po kliku u ranoj fazi.
 - Mesečni budžet-limit klikova po agenciji (sprečava nekontrolisan trošak).
 - `clicks` tabela beleži svaki klik na "Poseti agenciju" dugme, sa filtriranjem botova/duplikata (`is_valid` flag) pre fakturisanja.
-- Premium/"Istaknuto" pretplata kao drugi prihodni sloj (uvodi se ranije nego što je prvobitno planirano — od Faze 2, ne čekati Fazu 3, zbog sezonalnosti čistog CPC prihoda).
+- Premium/"Istaknuto" pretplata kao drugi prihodni sloj (uvodi se ranije nego što je prvobitno planirano — od Faze 2, ne čekati Fazu 3, zbog sezonalnosti čistog CPC prihoda). **Nije urađeno u Fazi 2/3** — prvi kandidat za Fazu 4.
 
 ## 10. Troškovi infrastrukture (okvirno)
 
 - Faza 1: Supabase Free tier dovoljan (0€), Vercel hobby tier (0€), jedini realan trošak je domen (~15-25€/god).
 - Prelazak na Supabase Pro (25$/mesec) preporučen PRE nego što prva prava agencija počne svakodnevno da koristi sistem (Free tier nema backup, pauzira se posle 7 dana neaktivnosti — neprihvatljivo za produkciju).
-- LLM API trošak (PDF/Excel ekstrakcija) je varijabilan po pozivu, relevantan tek od Faze 3.
+- LLM API trošak (PDF ekstrakcija, Claude API) je varijabilan po pozivu — **sad stvaran trošak**, ne budući (Faza 2/3 gotova, PDF upload ide kroz LLM na svaki upload jer "profil agencije" caching nije implementiran, vidi sekciju 8).
 
 ## 11. Poznata otvorena pitanja / za odluku tokom rada
 
-- Tačan format i granularnost review queue UI-ja (Faza 2) — nije dizajniran do detalja.
-- Da li prvi PDF-partner agencija ima konzistentan format kroz vreme ili se menja — utiče na to koliko brzo "profil agencije" mapping postaje pouzdan.
+Za granularnu, tekuću listu tech debt-a iz Faze 2/3 implementacije (OCR, background job, review queue za CSV/Excel, itd.) vidi `apps/admin/README.md` — ta lista se ažurira uživo kako se gradi, ovde su samo strateška/faza-nivo pitanja koja ostaju otvorena:
+
+- ~~Tačan format i granularnost review queue UI-ja (Faza 2)~~ — **rešeno**, izgrađeno u Fazi 2 (`/admin/review`, vidi sekciju 8).
+- Da li prvi PDF-partner agencija ima konzistentan format kroz vreme ili se menja — i dalje otvoreno, viđen samo jedan PDF do sad; utiče na to koliko brzo "profil agencije" mapping (koji ni nije implementiran, vidi sekciju 8) postaje isplativ.
 - Regionalna ekspanzija (Faza 5) zahteva pravnu proveru po zemlji — van scope-a trenutnog koda.
 - `operator` uloga — enum vrednost postoji u šemi, opseg prava (definisan u sekciji 6 ovog brief-a) nije još ožičen u kodu; nema potrebe dok postoji samo superadmin nalog.
 - MFA enforcement za superadmin/operator — enrollment radi, ali ništa trenutno ne primorava obavezan MFA pri svakom loginu; treba challenge/verify stranica + middleware provera `aal` nivoa.
-- Moderacija ponuda (Faza 2) — nove agencije treba da prođu ručno odobravanje za prvih nekoliko unosa pre nego što dobiju auto-publish pravo; mehanizam (npr. `agencies.auto_publish` polje) nije dizajniran do detalja.
-- Rezervisani-ali-neplaćeni datumi na ponudama (Faza 2) — treba `status` kolona (`pending`/`confirmed`) uz opseg datuma, ne prost opseg; poslovna odluka da li `pending` blokira termin za druge kupce nije doneta.
-- Recenzije — dogovoreno da gost ocenjuje posle boravka (ne agencija sama sebe), potreban sistem zaštite od lažnih recenzija (npr. samo gost koji je stvarno bookirao preko sajta); dizajn nije urađen.
+- Moderacija ponuda po agenciji (Faza 2) — ovo je odvojeno od confidence-based review queue-a koji je izgrađen: nove agencije treba da prođu ručno odobravanje za prvih nekoliko unosa pre nego što dobiju auto-publish pravo, nezavisno od AI pouzdanosti pojedinačne ponude; mehanizam (npr. `agencies.auto_publish` polje) nije dizajniran do detalja, nije urađeno.
+- Rezervisani-ali-neplaćeni datumi na ponudama (Faza 2) — treba `status` kolona (`pending`/`confirmed`) uz opseg datuma, ne prost opseg; poslovna odluka da li `pending` blokira termin za druge kupce nije doneta; nije urađeno.
+- Recenzije — dogovoreno da gost ocenjuje posle boravka (ne agencija sama sebe), potreban sistem zaštite od lažnih recenzija (npr. samo gost koji je stvarno bookirao preko sajta); dizajn nije urađen, ostaje za kad se gradi javni review flow na `apps/site`.
+- Premium/"Istaknuto" pretplata (vidi sekciju 9) — plan je bio da krene od Faze 2, nije urađeno; prvi kandidat za Fazu 4.
