@@ -8,7 +8,7 @@ Popunjava se postepeno, korak po korak, kako se implementacija odvija. Kad sve f
 
 *(sažeci za Fazu 1 nisu napisani u ovom stilu — vidi `apps/admin/README.md` za pun opis Koraka 1-8: skelet projekta, Supabase konekcija, baza, prijava korisnika, bezbednosna pravila, zaštićene stranice, meni po ulozi, i evidencija ko-je-šta-menjao.)*
 
-## Faza 2 — Unos i obrada ponuda (u toku)
+## Faza 2 — Unos i obrada ponuda (gotovo, spojeno u main)
 
 ### Korak 1 — Prazne fioke u bazi
 
@@ -42,9 +42,25 @@ Poseban trik — "pun snimak": svaki novi upload zamenjuje ceo prethodni spisak 
 
 **Zašto je bitno**: ovo je "mozak" koji pretvara sirov Excel/CSV u stvarne ponude koje se prikazuju. Bez ovoga, upload-ovan fajl samo sedi u trezoru bez ikakvog efekta.
 
-### Korak 4 — PDF/OCR/LLM ekstrakcija
+### Korak 4 — Digitalni činovnik koji čita PDF cenovnik
 
-*(preskočeno za sad — čeka zajedničku odluku o alatima, dolazi kasnije)*
+CSV/Excel fajlovi (Korak 3) su uredne tabele — lako ih čita program. PDF cenovnik agencije obično nije: to je slobodan tekst, često matrica (destinacija × vila × tip sobe × tip prevoza), napravljena da je čovek čita, ne kompjuter. Zato se ovde koristi veštačka inteligencija (Claude), kao digitalni činovnik koji "razume" tekst kao čovek:
+
+1. Iz PDF-a se izvuče sav tekst.
+2. Tekst se pošalje AI-ju sa uputstvom: svaka kombinacija vila + tip sobe + tip prevoza je jedna posebna ponuda, ne sme da se spaja u jedan red.
+3. AI vrati spisak ponuda (naziv, destinacija, datumi, cena, broj gostiju) — i za svaku, koliko je siguran da je dobro pročitao.
+4. Ponude gde je AI vrlo siguran idu odmah u promet. Manje sigurne idu u red za pregled (Korak 5) da ih čovek potvrdi pre objave.
+
+**Zašto je bitno**: u praksi agencije najčešće šalju baš ovakve PDF cenovnike, ne uredne tabele. Bez ovog koraka, najveći deo stvarnih podataka od agencija ne bi mogao da se obradi automatski.
+
+### Dodatno — prikaz svih ponuda i pauziranje
+
+Kad je isprobano sa pravim cenovnikom jedne agencije, jedan PDF je doneo preko 150 ponuda (sve kombinacije sobe/prevoza/vile). To je otkrilo dva nedostatka, odmah ispravljena:
+
+- **Stranicenje (paginacija)**: liste ponuda i pregleda su tiho prikazivale samo prvih 50 — sad imaju dugmad "Prethodna/Sledeća" da se vidi baš sve.
+- **Pauziranje ponude**: agencija sad sama može da privremeno "ugasi" već objavljenu ponudu (npr. kad se popune mesta) i kasnije je ponovo "upali", kao i da promeni broj slobodnih mesta — bez čekanja na tim. Cenu, datume i ostale podatke i dalje menja samo tim, kroz kontrolnu tačku (Korak 5).
+
+**Zašto je bitno**: pravi cenovnik od prave agencije je odmah otkrio ono što veštački test-primeri nisu — zato je testiranje sa stvarnim podacima bilo ključno, ne samo sa izmišljenim.
 
 ### Korak 5 — Kontrolna tačka pre javnosti
 
