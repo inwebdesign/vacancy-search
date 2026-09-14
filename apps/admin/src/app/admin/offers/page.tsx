@@ -57,8 +57,8 @@ export default async function OffersPage() {
       {canUpload && (
         <>
           <p className="mt-1 text-sm text-gray-400">
-            Uploaduj CSV/Excel/PDF fajl sa ponudama. CSV/Excel se odmah
-            obrađuje; PDF čeka Korak 4.
+            Uploaduj CSV/Excel/PDF fajl sa ponudama — obrada kreće odmah
+            (PDF preko Claude API-ja može potrajati 10-30s).
           </p>
           <UploadForm />
         </>

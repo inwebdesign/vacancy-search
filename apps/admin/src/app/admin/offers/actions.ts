@@ -22,10 +22,10 @@ export type UploadFileState = {
   summary?: string;
 } | null;
 
-// Faza 2, Korak 2: prima i čuva fajl. Korak 3: odmah zatim parsira CSV/Excel
-// (ingestUpload) — SINHRONO, privremeno rešenje dok se ne odluči pravi
-// background-job mehanizam (brief traži async + realtime status, vidi
-// napomenu u lib/offers/ingest.ts). PDF ostaje "pending" do Koraka 4.
+// Faza 2, Korak 2: prima i čuva fajl. Korak 3/4: odmah zatim parsira
+// CSV/Excel/PDF (ingestUpload) — SINHRONO, privremeno rešenje dok se ne
+// odluči pravi background-job mehanizam (brief traži async + realtime
+// status, vidi napomenu u lib/offers/ingest.ts).
 export async function uploadFile(
   _prevState: UploadFileState,
   formData: FormData,
@@ -87,20 +87,17 @@ export async function uploadFile(
 
   revalidatePath("/admin/offers");
 
-  if (tip === "pdf") {
-    return {
-      success: true,
-      summary: "Fajl je primljen. PDF obrada dolazi u sledećem koraku.",
-    };
-  }
-
   try {
     const result = await ingestUpload(uploadRow.id);
     revalidatePath("/admin/offers");
 
     if (result.missingColumns.length > 0) {
+      const reason =
+        tip === "pdf"
+          ? result.missingColumns.join(", ")
+          : `nedostaju kolone: ${result.missingColumns.join(", ")}`;
       return {
-        error: `Fajl je sačuvan, ali obrada nije uspela — nedostaju kolone: ${result.missingColumns.join(", ")}.`,
+        error: `Fajl je sačuvan, ali obrada nije uspela — ${reason}.`,
       };
     }
 
