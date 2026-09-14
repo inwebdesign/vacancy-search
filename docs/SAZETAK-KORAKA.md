@@ -57,8 +57,10 @@ CSV/Excel fajlovi (Korak 3) su uredne tabele — lako ih čita program. PDF ceno
 
 Kad je isprobano sa pravim cenovnikom jedne agencije, jedan PDF je doneo preko 150 ponuda (sve kombinacije sobe/prevoza/vile). To je otkrilo dva nedostatka, odmah ispravljena:
 
-- **Stranicenje (paginacija)**: liste ponuda i pregleda su tiho prikazivale samo prvih 50 — sad imaju dugmad "Prethodna/Sledeća" da se vidi baš sve.
+- **Stranicenje (paginacija) i pretraga**: liste ponuda i pregleda su tiho prikazivale samo prvih 50 — sad imaju dugmad "Prethodna/Sledeća" da se vidi baš sve, plus pretragu po nazivu, destinaciji, agenciji i statusu.
 - **Pauziranje ponude**: agencija sad sama može da privremeno "ugasi" već objavljenu ponudu (npr. kad se popune mesta) i kasnije je ponovo "upali", kao i da promeni broj slobodnih mesta — bez čekanja na tim. Cenu, datume i ostale podatke i dalje menja samo tim, kroz kontrolnu tačku (Korak 5).
+- **Link ka konkretnom apartmanu**: kad AI izvuče ponude iz PDF cenovnika, ne zna tačan link ka svakom apartmanu (cenovnik ga ne sadrži) — svaka ponuda iz istog PDF-a je prvo dobijala isti opšti link ka sajtu agencije (klik je vodio na početnu stranicu, ne na konkretan apartman). Sad agencija sama unosi ispravan link za svaku ponudu, na istom mestu gde pauzira ponude.
+- **Agencija sama unosi svoje ime**: stranica "Agencije" je do sad bila prazna ("uskoro") — sad agencija tu unosi svoj naziv, kontakt i sajt, umesto da to neko ručno upisuje u bazu.
 
 **Zašto je bitno**: pravi cenovnik od prave agencije je odmah otkrio ono što veštački test-primeri nisu — zato je testiranje sa stvarnim podacima bilo ključno, ne samo sa izmišljenim.
 
