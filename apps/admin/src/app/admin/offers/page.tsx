@@ -23,9 +23,15 @@ const OFFER_STATUS_LABEL: Record<string, string> = {
   expired: "Isteklo",
 };
 
+const PAGE_SIZE = 50;
+
 // Faza 2, Korak 2: upload intake. Korak 3: CSV/Excel parsing sad upisuje
 // offers (sinhrono, privremeno — vidi lib/offers/ingest.ts).
-export default async function OffersPage() {
+export default async function OffersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
   const me = await requireRole([
     "superadmin",
     "operator",
@@ -33,21 +39,30 @@ export default async function OffersPage() {
     "agency_user",
   ]);
 
+  const { page: pageParam } = await searchParams;
+  const page = Math.max(1, Number(pageParam) || 1);
+  const from = (page - 1) * PAGE_SIZE;
+  const to = from + PAGE_SIZE - 1;
+
   const supabase = await createClient();
-  const [{ data: uploads }, { data: offers }] = await Promise.all([
-    supabase
-      .from("uploads")
-      .select("id, originalni_fajl_url, tip, status, created_at")
-      .order("created_at", { ascending: false })
-      .limit(50),
-    supabase
-      .from("offers")
-      .select(
-        "id, naziv, destinacija, datum_polaska, datum_povratka, cena_eur, status, confidence_score",
-      )
-      .order("updated_at", { ascending: false })
-      .limit(50),
-  ]);
+  const [{ data: uploads }, { data: offers, count: offersCount }] =
+    await Promise.all([
+      supabase
+        .from("uploads")
+        .select("id, originalni_fajl_url, tip, status, created_at")
+        .order("created_at", { ascending: false })
+        .limit(50),
+      supabase
+        .from("offers")
+        .select(
+          "id, naziv, destinacija, datum_polaska, datum_povratka, cena_eur, status, confidence_score",
+          { count: "exact" },
+        )
+        .order("updated_at", { ascending: false })
+        .range(from, to),
+    ]);
+
+  const totalPages = Math.max(1, Math.ceil((offersCount ?? 0) / PAGE_SIZE));
 
   const canUpload = me.role === "agency_admin" || me.role === "agency_user";
 
@@ -64,7 +79,13 @@ export default async function OffersPage() {
         </>
       )}
 
-      <h2 className="mt-8 text-lg font-medium">Ponude</h2>
+      <h2 className="mt-8 text-lg font-medium">
+        Ponude {offersCount !== null && offersCount !== undefined && (
+          <span className="text-sm font-normal text-gray-400">
+            ({offersCount} ukupno)
+          </span>
+        )}
+      </h2>
       <table className="mt-3 w-full text-left text-sm">
         <thead>
           <tr className="border-b border-gray-200 text-gray-500">
@@ -98,6 +119,40 @@ export default async function OffersPage() {
           )}
         </tbody>
       </table>
+
+      {totalPages > 1 && (
+        <div className="mt-3 flex items-center gap-3 text-sm">
+          <a
+            href={page <= 1 ? undefined : `/admin/offers?page=${page - 1}`}
+            aria-disabled={page <= 1}
+            className={
+              page <= 1
+                ? "pointer-events-none text-gray-300"
+                : "text-gray-700 underline"
+            }
+          >
+            ← Prethodna
+          </a>
+          <span className="text-gray-500">
+            Strana {page} od {totalPages}
+          </span>
+          <a
+            href={
+              page >= totalPages
+                ? undefined
+                : `/admin/offers?page=${page + 1}`
+            }
+            aria-disabled={page >= totalPages}
+            className={
+              page >= totalPages
+                ? "pointer-events-none text-gray-300"
+                : "text-gray-700 underline"
+            }
+          >
+            Sledeća →
+          </a>
+        </div>
+      )}
 
       <h2 className="mt-8 text-lg font-medium">Istorija upload-a</h2>
       <table className="mt-3 w-full text-left text-sm">
