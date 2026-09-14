@@ -1,25 +1,48 @@
 import { requireRole } from "@/lib/auth/require-role";
 import { createClient } from "@/lib/supabase/server";
+import { Pagination } from "@/components/Pagination";
 import { ReviewRow } from "./ReviewRow";
+
+const PAGE_SIZE = 50;
 
 // Faza 2, Korak 5: sve pending_review ponude, svih agencija (superadmin/
 // operator, po brief sekciji 6). Nema "svoja agencija" filter ovde — to je
 // tačno operator-ova nadležnost.
-export default async function ReviewPage() {
+export default async function ReviewPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
   await requireRole(["superadmin", "operator"]);
 
+  const { page: pageParam } = await searchParams;
+  const page = Math.max(1, Number(pageParam) || 1);
+  const from = (page - 1) * PAGE_SIZE;
+  const to = from + PAGE_SIZE - 1;
+
   const supabase = await createClient();
-  const { data: offers } = await supabase
+  const { data: offers, count: offersCount } = await supabase
     .from("offers")
     .select(
       "id, naziv, destinacija, datum_polaska, datum_povratka, cena_eur, max_gostiju, dostupno_mesta, kontakt_url, confidence_score, agencies(naziv)",
+      { count: "exact" },
     )
     .eq("status", "pending_review")
-    .order("created_at", { ascending: true });
+    .order("created_at", { ascending: true })
+    .range(from, to);
+
+  const totalPages = Math.max(1, Math.ceil((offersCount ?? 0) / PAGE_SIZE));
 
   return (
     <div>
-      <h1 className="text-xl font-semibold">Review queue</h1>
+      <h1 className="text-xl font-semibold">
+        Review queue{" "}
+        {offersCount !== null && offersCount !== undefined && (
+          <span className="text-sm font-normal text-gray-400">
+            ({offersCount} ukupno)
+          </span>
+        )}
+      </h1>
       <p className="mt-1 text-sm text-gray-400">
         Ponude koje čekaju ručnu potvrdu — izmeni pre odobravanja ako treba,
         pa odobri ili odbij.
@@ -66,6 +89,8 @@ export default async function ReviewPage() {
           </tbody>
         </table>
       </div>
+
+      <Pagination page={page} totalPages={totalPages} basePath="/admin/review" />
     </div>
   );
 }

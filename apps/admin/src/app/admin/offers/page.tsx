@@ -1,5 +1,6 @@
 import { requireRole } from "@/lib/auth/require-role";
 import { createClient } from "@/lib/supabase/server";
+import { Pagination } from "@/components/Pagination";
 import { UploadForm } from "./UploadForm";
 
 // Path format je {agencyId}/{uuid}-{filename} (vidi actions.ts) — skida
@@ -120,39 +121,7 @@ export default async function OffersPage({
         </tbody>
       </table>
 
-      {totalPages > 1 && (
-        <div className="mt-3 flex items-center gap-3 text-sm">
-          <a
-            href={page <= 1 ? undefined : `/admin/offers?page=${page - 1}`}
-            aria-disabled={page <= 1}
-            className={
-              page <= 1
-                ? "pointer-events-none text-gray-300"
-                : "text-gray-700 underline"
-            }
-          >
-            ← Prethodna
-          </a>
-          <span className="text-gray-500">
-            Strana {page} od {totalPages}
-          </span>
-          <a
-            href={
-              page >= totalPages
-                ? undefined
-                : `/admin/offers?page=${page + 1}`
-            }
-            aria-disabled={page >= totalPages}
-            className={
-              page >= totalPages
-                ? "pointer-events-none text-gray-300"
-                : "text-gray-700 underline"
-            }
-          >
-            Sledeća →
-          </a>
-        </div>
-      )}
+      <Pagination page={page} totalPages={totalPages} basePath="/admin/offers" />
 
       <h2 className="mt-8 text-lg font-medium">Istorija upload-a</h2>
       <table className="mt-3 w-full text-left text-sm">
