@@ -5,6 +5,7 @@ import { FilterBar } from "@/components/FilterBar";
 import { buildOfferSearchOr } from "@/lib/search-filter";
 import { UploadForm } from "./UploadForm";
 import { OfferStatusControl } from "./OfferStatusControl";
+import { OfferKontaktUrlControl } from "./OfferKontaktUrlControl";
 
 const STATUS_OPTIONS = [
   { value: "pending_review", label: "Čeka pregled" },
@@ -84,7 +85,7 @@ export default async function OffersPage({
   let offersQuery = supabase
     .from("offers")
     .select(
-      "id, naziv, destinacija, datum_polaska, datum_povratka, cena_eur, status, confidence_score, dostupno_mesta",
+      "id, naziv, destinacija, datum_polaska, datum_povratka, cena_eur, status, confidence_score, dostupno_mesta, kontakt_url",
       { count: "exact" },
     )
     .order("updated_at", { ascending: false })
@@ -143,6 +144,7 @@ export default async function OffersPage({
             <th className="py-2 pr-4 font-medium">Polazak — povratak</th>
             <th className="py-2 pr-4 font-medium">Cena</th>
             <th className="py-2 pr-4 font-medium">Status</th>
+            <th className="py-2 pr-4 font-medium">Link ka apartmanu</th>
           </tr>
         </thead>
         <tbody>
@@ -161,11 +163,17 @@ export default async function OffersPage({
                   dostupnoMesta={o.dostupno_mesta}
                 />
               </td>
+              <td className="py-2 pr-4">
+                <OfferKontaktUrlControl
+                  offerId={o.id}
+                  kontaktUrl={o.kontakt_url}
+                />
+              </td>
             </tr>
           ))}
           {(offers ?? []).length === 0 && (
             <tr>
-              <td colSpan={5} className="py-4 text-gray-400">
+              <td colSpan={6} className="py-4 text-gray-400">
                 Nema ponuda još.
               </td>
             </tr>

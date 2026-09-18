@@ -201,3 +201,57 @@ export async function updateOfferCapacity(
   revalidatePath("/admin/offers");
   return { success: true };
 }
+
+// Izmena kontakt_url-a — link ka konkretnom apartmanu na agencijinom sajtu.
+// PDF ekstrakcija (Korak 4) ne ume da izvuče link po ponudi (cenovnici ga
+// obično ni ne sadrže), pa svaka PDF ponuda dobija isti opšti link agencije
+// kao privremenu vrednost (vidi lib/offers/ingest.ts) — ovo agenciji daje
+// način da to ispravi na konkretan apartman. Isto pravilo kao pauza/
+// kapacitet, vidi gore; dozvoljeno bez obzira na status ponude (agencija
+// može da doda link i pre nego što je ponuda objavljena), vidi migraciju
+// 20260916100000.
+export async function updateOfferKontaktUrl(
+  offerId: string,
+  kontaktUrl: string,
+): Promise<OfferActionState> {
+  const me = await getCurrentProfile();
+  if (
+    !me ||
+    !["superadmin", "operator", "agency_admin", "agency_user"].includes(
+      me.role,
+    )
+  ) {
+    return { error: "Nemate dozvolu za ovu akciju." };
+  }
+
+  const trimmed = kontaktUrl.trim();
+  if (!trimmed) {
+    return { error: "Link ne sme biti prazan." };
+  }
+  try {
+    new URL(trimmed);
+  } catch {
+    return { error: "Unesi ispravan link (npr. https://...)." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("offers")
+    .update({ kontakt_url: trimmed })
+    .eq("id", offerId);
+  if (error) {
+    return { error: `Izmena nije uspela: ${error.message}` };
+  }
+
+  await logAudit({
+    actorId: me.userId,
+    actorEmail: me.email,
+    action: "offer.update_kontakt_url",
+    targetTable: "offers",
+    targetId: offerId,
+    diff: { kontakt_url: trimmed },
+  });
+
+  revalidatePath("/admin/offers");
+  return { success: true };
+}

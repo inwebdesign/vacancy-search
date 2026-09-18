@@ -274,7 +274,7 @@ Realan PDF cenovnik partner agencije se pokazao mnogo složeniji od flat CSV tem
 - **Ekstrakcija**: `lib/offers/pdf-extract.ts`, Claude API (`claude-opus-5`, streaming, `max_tokens: 64000` — veliki dokumenti lako prerastu par hiljada tokena izlaza). Model vraća JSON niz ponuda, uz `uncertain: true` na redovima gde je nesiguran (nejasna ćelija, dvosmislen kod sobe...).
 - **Confidence/status**: `uncertain: false` → `published`, `confidence_score: 0.9`; `uncertain: true` → `pending_review`, `confidence_score: 0.5`. Ovo je mesto gde brief-ov princip "sve što ne prođe prag pouzdanosti ide u review queue" stvarno ima efekta (za razliku od Koraka 3, gde CSV/Excel parsing nema prave "nesigurnosti").
 - **`dostupno_mesta`**: uvek `null` za PDF-izvučene ponude — izvor ne navodi broj slobodnih mesta.
-- **`kontakt_url`**: `agencies.website` (fallback `agencies.kontakt`) — PDF cenovnici nemaju link po ponudi, samo opšti kontakt agencije.
+- **`kontakt_url`**: `agencies.website` (fallback `agencies.kontakt`) kao privremena vrednost — PDF cenovnici nemaju link po ponudi, samo opšti kontakt agencije. Agencija naknadno sama ispravlja na link ka konkretnom apartmanu preko editabilnog polja na `/admin/offers` ("Link ka apartmanu" kolona) — vidi napomenu ispod o proširenju RLS/trigera iz pauziranja ponude.
 - **Model**: `claude-opus-5` (ne `claude-sonnet-5`) — projektni default za kvalitet ekstrakcije osetljive na tačnost cena.
 
 Testirano na tekstu realnog PDF-a partner agencije (Aqua Travel, last-minute cenovnik za Grčku) — 42 ponude tačno izvučene iz isečka dokumenta, uključujući tačno izvedeni `max_gostiju` iz kodova soba (1/2, 1/3, ¼...) i realnu detekciju nesigurnih redova.
@@ -288,6 +288,17 @@ Testirano na tekstu realnog PDF-a partner agencije (Aqua Travel, last-minute cen
 Javna (bez auth) ruta `/go/[offerId]` — brief sekcija 9: "clicks tabela beleži svaki klik". Zapisuje preko `service_role` (anoniman posetilac nema sesiju), 302 redirect na `offer.kontakt_url`. `is_valid = false` za user-agent koji liči na bot/skriptu (regex) ILI ponovljen klik sa iste IP adrese na istu ponudu u poslednjih 30 min.
 
 **Nije ožičeno na `apps/site`** — taj sajt čita mock podatke, ne pravu `offers` tabelu; brief eksplicitno isključuje javni sajt iz scope-a (sekcija 1). Testirano direktno preko URL-a.
+
+### Dodatna unapređenja (posle testiranja na realnim podacima, van originalnog plana)
+
+Realan PDF partner agencije (150+ ponuda iz jednog upload-a) je otkrio nekoliko nedostataka koji nisu bili vidljivi na veštačkim test podacima:
+
+- **Paginacija + filteri** na `/admin/offers` i `/admin/review` — tabele su tiho sekle prikaz na prvih 50 redova (default limit/PostgREST row limit), preko 100 ponuda je bilo nevidljivo u UI-ju. Dodata `?page=N` paginacija, i filteri (pretraga po nazivu/destinaciji/agenciji, status) preko deljenih `components/Pagination.tsx` i `components/FilterBar.tsx`.
+- **Pauziranje/reaktiviranje objavljene ponude + kapacitet** — agencija sama upravlja `status` (published ↔ paused) i `dostupno_mesta` svoje ponude, bez čekanja na tim. Granica je na nivou baze (`offers_update_agency_own` RLS policy + `offers_agency_edit_scope` trigger), ne samo UI — trigger ograničava agenciju na te dve kolone plus (naknadno) `kontakt_url`, superadmin/operator nisu ograničeni.
+- **`kontakt_url` editabilan po ponudi** (`/admin/offers`, kolona "Link ka apartmanu") — PDF ekstrakcija postavlja isti opšti link agencije na svaku ponudu iz tog PDF-a (cenovnici nemaju link po apartmanu); agencija ručno ispravlja na konkretan apartman. Isto RLS/trigger pravilo kao pauza/kapacitet, dozvoljeno bez obzira na status ponude (agencija može da doda link i pre nego što je ponuda objavljena).
+- **Agencija sama unosi/menja svoj naziv/kontakt/website** (`/admin/agencies`) — do sad ovo nije imalo nikakvu UI putanju sem ručnog upisa u bazu; stranica je bila čist "coming soon" plejsholder za sve uloge. Isti RLS+trigger obrazac (`agencies_update_agency_admin` + `agencies_self_edit_scope`), samo `agency_admin` (ne `agency_user`).
+- **Bug fix**: review tabela je prikazivala prazno polje agencije iako je podatak postojao — Supabase embedded resurs za many-to-one FK vraća objekat (`{ naziv: "..." }`), kod je pristupao kao nizu (`.agencies?.[0]?.naziv`).
+- **`max_gostiju` više nije editabilno u review-u** — izvedeno je iz šifre sobe u `naziv` (npr. "1/4 STD" = 4 gosta), slobodna izmena je mogla da ga rastavi od naziva bez upozorenja. Prikazuje se kao read-only tekst; ako AI pogrešno pročita šifru sobe, reviewer koristi "Odbij" umesto ručnog krpljenja izvedenog broja.
 
 ## Sledeći koraci (Faza 1)
 
