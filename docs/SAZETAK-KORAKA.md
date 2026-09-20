@@ -104,4 +104,14 @@ Stari sajt je bio samo maketa sa izmišljenim apartmanima. Zamenjen je novim, pr
 
 **Zašto je bitno**: ovo je temelj na kom se grade pretraga i rezultati, i zbog izbora alata sajt će moći da se dobro pozicionira na Google-u.
 
+### Korak 3 — Pretraga "iza pulta"
+
+Pre nego što se sajt uopšte nacrta, napravljen je motor pretrage — kao radnik iza šaltera koji na pitanje posetioca ume da izvuče prave ponude iz magacina. Pita se: gde (ukucaš slovo po slovo, a rezultati se sužavaju), kada, koliko gostiju. Motor vraća samo objavljene ponude koje još nisu prošle i nisu rasprodate, poređane od najjeftinije, po 20 na stranu.
+
+Dva važna detalja: (1) sajt ne šalje upit na svako slovo odmah, nego sačeka kratku pauzu dok posetilac ne prestane da kuca (300 ms) — inače bi jedno ukucano ime grada napravilo desetak nepotrebnih upita. (2) Nevažeći ili čudan unos (npr. slova umesto datuma, broj strane koji ne postoji) ne ruši sajt, nego se tiho zanemari.
+
+Motor je proveren sa 46 automatskih testova, uključujući proveru da svaki filter daje isti rezultat kao ručno brojanje nad istim podacima. Test je usput našao grešku: ručno ukucan broj strane koji ne postoji je rušio stranicu — ispravljeno.
+
+**Zašto je bitno**: ovo je "mozak" sajta. Kad stigne dizajn, ostaje samo da se motor poveže sa lepim izgledom — logika je već gotova i proverena.
+
 ### Faza 3, 4, 5 — *(dolazi)*

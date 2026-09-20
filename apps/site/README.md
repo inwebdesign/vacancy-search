@@ -2,7 +2,7 @@
 
 Metasearch za turističke agencije u Srbiji: korisnik pretražuje destinaciju/period/broj gostiju i vidi ponude više agencija jednu pored druge, pa odlazi kod agencije da završi rezervaciju (klik-out, bez plaćanja/rezervacije na platformi). Ponude puni `apps/admin`, sajt ih samo čita.
 
-Plan razvoja: [`docs/PLAN-JAVNI-SAJT.md`](../../docs/PLAN-JAVNI-SAJT.md). **Trenutno stanje: Korak 2 (skelet)** — prazna početna stranica, konekcija ka bazi spremna; pretraga i UI dolaze u sledećim koracima (UI čeka dizajn sistem).
+Plan razvoja: [`docs/PLAN-JAVNI-SAJT.md`](../../docs/PLAN-JAVNI-SAJT.md). **Trenutno stanje: Korak 3 (data sloj)** — pretraga ponuda je gotova i testirana (`searchOffers`), ali nema UI-ja: početna je placeholder, UI čeka dizajn sistem (Korak 4).
 
 ## Stack
 
@@ -35,6 +35,17 @@ npm run build:site
 ```
 src/app/                   Next.js App Router (layout, početna)
 src/lib/supabase/public.ts Server-only Supabase klijent (anon ključ, bez sesije)
+src/lib/offers/params.ts   Čist kod: parsiranje/validacija URL parametara pretrage, escapeLike, današnji datum u Srbiji
+src/lib/offers/search.ts   Server-only: searchOffers() — pretraga objavljenih ponuda (najjeftinije prvo, 20 po strani)
+src/lib/debounce.ts        debounce za unos pretrage (300ms), koristi ga UI u Koraku 4
 ```
+
+## Testovi
+
+```bash
+npm run test:site     # iz korena (ili npm test u apps/site)
+```
+
+Vitest. Čisti testovi (parsiranje, debounce) rade bez ičega; integracioni testovi pretrage i "ugovor sa bazom" gađaju pravu dev bazu anon ključem, pa traže popunjen `apps/site/.env.local` i bar jednu objavljenu ponudu u bazi. Pretraga je testirana model-based (SQL filter mora da vrati isto što i JS filter nad istim podacima), ne vezano za konkretne brojke u bazi.
 
 Šema baze i migracije žive isključivo u `apps/admin/prisma` — sajt nema Prisma, samo čita preko `supabase-js`.

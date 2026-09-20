@@ -8,6 +8,7 @@
     "dev:site": "npm run dev --workspace=apps/site",
     "dev:admin": "npm run dev --workspace=apps/admin",
     "build:site": "npm run build --workspace=apps/site",
-    "build:admin": "npm run build --workspace=apps/admin"
+    "build:admin": "npm run build --workspace=apps/admin",
+    "test:site": "npm run test --workspace=apps/site"
   }
 }
