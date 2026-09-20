@@ -29,4 +29,10 @@ npm run build:site
 npm run build:admin
 ```
 
+## Testovi
+
+```bash
+npm run test:site
+```
+
 Detalji o svakoj aplikaciji (funkcionalnosti, environment varijable, struktura) nalaze se u README fajlu odgovarajućeg foldera.

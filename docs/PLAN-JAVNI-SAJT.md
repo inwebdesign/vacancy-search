@@ -54,18 +54,24 @@ Testirano direktno na dev bazi (simulacija `anon` role bez JWT-a, u transakciji,
 
 **Kriterijum završetka**: `npm run dev`/`npm run build` prolaze, prazna početna stranica se učitava na `localhost` bez greške.
 
-### Korak 3 — Data sloj (pretraga ponuda)
+### Korak 3 — Data sloj (pretraga ponuda) (gotovo)
 
-Funkcija koja prima `{ destinacija, datumOd, datumDo, brojGostiju }` i vraća `offers` gde:
-- `status = 'published'` (implicitno kroz RLS, ali eksplicitno i u kodu — odbrana u dubinu, ne oslanjanje samo na bazu).
-- Datumi se **preklapaju** sa traženim periodom (`datum_polaska <= datumOd` AND `datum_povratka >= datumDo` — ili obrnuto zavisno od finalne definicije "preklapanja"), ne traži se tačno poklapanje.
-- `max_gostiju >= brojGostiju`.
+**Odluke (dogovoreno):** destinacija je **slobodan tekst koji filtrira na svako slovo** (uz debounce, vidi Korak 4); redosled je **najjeftinije prvo** (kasnije "Sponzorisano" prvo — tech debt).
 
-Ne zavisi od dizajna — testira se direktno (skripta ili debug ruta), isti obrazac kao dosadašnje RLS/upit provere na dev bazi.
+**Urađeno** (`apps/site/src/lib/`):
+- `offers/params.ts` — čist kod: `parseSearchParams` (URL → provereni parametri; nevažeća vrednost se tiho izbacuje, ne baca grešku), `escapeLike`, `todayInBelgrade`. Destinacija: trim, sažet razmak, bez `*`, max 100 znakova; datumi `YYYY-MM-DD` (nepostojeći poput 2026-02-31 se odbacuju, zamenjen redosled se ispravlja); gosti ceo broj 1–30; strana 1–500.
+- `offers/search.ts` (server-only) — `searchOffers(params)` vraća `{ offers, total, page, pageSize, totalPages }`. Filteri: destinacija **sadrži** tekst (ILIKE, bez razlike u veličini slova, `%`/`_` doslovno); datumi = **preklapanje** (`polazak <= do` I `povratak >= od`, sa jednim datumom važi samo ta strana); `max_gostiju >= brojGostiju`. Uvek: `status = 'published'` (i u kodu, uz RLS — odbrana u dubinu), ne prošli polazak (`polazak >= danas` u Srbiji), ne rasprodato (`dostupno_mesta` prazno ili > 0). Redosled `cena_eur ASC, id ASC` (id radi stabilne paginacije), 20 po strani. Traži samo javnih 9 kolona + ime agencije.
+- `debounce.ts` — `debounce(fn, ms)` sa `cancel`, `SEARCH_DEBOUNCE_MS = 300`.
 
-**Otvoreno, rešiti pre/tokom ovog koraka**: slobodna tekstualna pretraga destinacije ili padajuća lista poznatih destinacija; podrazumevano sortiranje rezultata (cena? "ažurirano pre X"? relevantnost?).
+**Greška nađena testom i ispravljena:** strana iza poslednje (ručno `?page=400`) je bacala grešku baze ("Requested range not satisfiable") — javni URL bi rušio stranicu. Sad vraća praznu listu uz tačan `total`.
 
-**Kriterijum završetka**: funkcija vraća tačne rezultate za realne upite protiv dev baze (npr. "Paralia, avgust, 2 gosta" vraća očekivane redove iz Aqua Travel PDF-a).
+**Testovi** (`npm run test:site`, Vitest, 46 testova): parsiranje/escape/vremenska zona/debounce (čisto, bez baze) + integracioni testovi protiv prave dev baze sa anon ključem. Pretraga je testirana **model-based**: povuku se sve ponude, pa svaki filter i njihove kombinacije moraju da vrate tačno isto što bi vratio običan JS filter nad istim podacima (ne vežu se za brojke u bazi). Plus "ugovor sa bazom": anon vidi samo `published`, skrivene kolone i `select *` daju 42501, `agencies.pib` itd. zaključano. Mutaciono provereno: pokvaren filter gostiju ili datuma → testovi padaju. (Izbacivanje `status = 'published'` iz koda testove NE obara — namerno, RLS nameće isto pravilo; taj sloj pokriva ugovorni test.) Proveren i u pravom Next runtime-u (privremena debug ruta, obrisana).
+
+**Napomena za razvoj:** trenutni podaci u dev bazi imaju polaske u avgustu 2026, a danas je posle toga — pretraga sa pravim "danas" zato ne vraća ništa. Testovi zadaju `today` eksplicitno. Vidi i tech debt (auto-isticanje).
+
+**Za odluku (nađeno tokom testiranja):** `cena_eur` nije uporediva između ponuda. PDF cenovnik ima "cenu po osobi" (autobuski prevoz) i "cenu za smeštajnu jedinicu" (sopstveni prevoz), a razlika postoji samo u tekstu `naziv`, ne u koloni. U dev bazi: 68 objavljenih je po osobi (135–346 €), ali 76 od 86 ponuda na čekanju je po jedinici (396–918 €) — kad se odobre, "najjeftinije prvo" će pomešati jabuke i kruške (jedinica za 4 osobe od 648 € je 162 €/osobi, jeftinija od većine "po osobi"). Predlog: kolona `cena_tip` (`po_osobi`/`po_jedinici`) koju popunjava AI ekstrakcija, plus izvedena cena po osobi za sortiranje (jedinica / `max_gostiju`).
+
+**Kriterijum završetka — ispunjen**: funkcija vraća tačne rezultate za realne upite protiv dev baze (npr. "par" + 2 gosta → 15 ponuda; "Paralia" 17–19.08. + 2 gosta → 7).
 
 ### Korak 4 — UI komponente (ČEKA dizajn sistem)
 
@@ -73,6 +79,8 @@ Ne zavisi od dizajna — testira se direktno (skripta ili debug ruta), isti obra
 - Svaka kartica ponude MORA imati vidljiv "ažurirano pre X" pečat (freshness indicator).
 - Svaka kartica MORA imati disclaimer da agencija potvrđuje konačnu cenu — platforma nije izvor istine.
 - Dugme "Poseti agenciju" vodi kroz `/go/[offerId]` (Korak 5), ne direktno na `kontakt_url`.
+
+**Pretraga "na svako slovo" — ugovor sa Korakom 3 (performanse):** svaki upit je Server Component render + poziv baze, pa unos MORA da bude debounce-ovan. Predviđeni tok: input drži lokalno stanje (kucanje je trenutno) → `debounce(..., SEARCH_DEBOUNCE_MS = 300)` (`src/lib/debounce.ts`, već napravljen i testiran) → `router.replace('?destinacija=...')` unutar `startTransition` (ostaje prethodni rezultat dok stiže novi; poslednji upit pobeđuje) → Server Component čita `searchParams`, zove `parseSearchParams` + `searchOffers`. URL je pravo stanje pretrage (deljivo, radi "nazad"). Na promenu filtera vraćati `page` na 1. Enter u polju treba odmah da pošalje (bez čekanja). Ako `searchOffers` vrati `offers: []` uz `page > totalPages`, preusmeriti na poslednju stranu.
 
 ### Korak 5 — Klik-tracking u `apps/site`
 
@@ -90,6 +98,7 @@ Preseljenje `/go/[offerId]` logike iz `apps/admin` u `apps/site` (Next.js Route 
 
 ## Otvorena pitanja (van scope-a ovog prolaza, ne blokiraju start)
 
-- Paginacija/broj rezultata po pretrazi na javnom sajtu (isto pitanje kao admin liste, ali za javni deo).
+- ~~Paginacija/broj rezultata po pretrazi~~ — rešeno u Koraku 3: 20 po strani, `?page=N`.
+- Tech debt iz Koraka 3 (sponzorisane ponude, pretraga bez dijakritika i po nazivu, trigram indeks, rate limiting, auto-isticanje prošlih ponuda, cena po osobi vs po jedinici) — vidi `apps/admin/README.md`, sekcija "Tech debt".
 - SEO detalji (meta tagovi, sitemap, structured data po ponudi) — nije pokriveno ovim planom, dodati posle osnovne funkcionalnosti.
 - Da li se ista vila kod više agencija na neki način vizuelno grupiše na rezultatima, ili se tretira kao potpuno nezavisan rezultat — trenutna pretpostavka je "potpuno nezavisan rezultat" (prirodno iz šeme, nema cross-agency unique constraint), menjati samo ako se pokaže da korisnicima smeta.
