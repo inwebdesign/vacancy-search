@@ -96,6 +96,8 @@ Baza je do sad bila zaključana za svakoga ko nije ulogovan. Sad je na njoj napr
 
 Dopuna Koraka 1: posetilac sada može da vidi i **ime agencije** uz ponudu ("Izvor: Agencija A"), ali samo ime — ništa drugo o agenciji (cene naplate, PIB, kontakt) nije dostupno javnosti, i to je zaključano u samoj bazi. Vidi se samo ime agencije koja ima bar jednu objavljenu ponudu.
 
+Druga dopuna: pošto je "ključ posetioca" javan (može ga uzeti svako), baza je zaključana i po **kolonama**, ne samo po ponudama. Posetilac vidi samo ono što ide u izlog — naziv, destinaciju, datume, cenu, broj gostiju i kad je ažurirano. Interne podatke (koliko je AI bio siguran, iz kog je fajla ponuda) i direktni link ka agenciji ostaju u magacinu. Link je zaključan i zato da niko ne može da preskoči naš brojač klikova, na kom se zasniva naplata.
+
 ### Korak 2 — Prazan nov sajt, spreman za građenje
 
 Stari sajt je bio samo maketa sa izmišljenim apartmanima. Zamenjen je novim, praznim temeljom — istim alatom kao admin deo — koji je već povezan sa bazom, ali za sada prikazuje samo naslov "Slobodno". Sajt čita bazu isključivo "sa svoje strane" (server), pa posetiočev pregledač nikad ne razgovara direktno sa bazom. Izgled se pravi tek kad bude gotov dizajn.
