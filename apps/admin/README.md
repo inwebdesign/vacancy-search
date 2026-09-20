@@ -319,3 +319,9 @@ Realan PDF partner agencije (150+ ponuda iz jednog upload-a) je otkrio nekoliko 
 - [x] Korak 4: PDF/LLM ekstrakcija (Claude API) — testirano na realnom PDF-u partner agencije
 - [x] Korak 5: review queue
 - [x] Korak 6: click tracking (click-out endpoint, nije ožičeno na `apps/site`)
+
+## Javni sajt — uvezivanje `apps/site` sa bazom (van Faze 2, u toku)
+
+Pun plan: `docs/PLAN-JAVNI-SAJT.md`. Jedina izmena na `apps/admin` strani u celom tom planu je RLS politika ispod — ostatak (Next.js skelet za `apps/site`, data sloj, UI, klik-tracking) se dešava u `apps/site`, ne ovde.
+
+- [x] **Korak 1 — RLS politika za javno čitanje.** Migracija `20260920100000_public_offers_select`: nova `offers_select_public` policy, `FOR SELECT TO anon USING (status = 'published')`. Testirano direktno na dev bazi (simulacija `anon` role bez JWT-a) — anon vidi SAMO `published` ponude, nema pristup `uploads`/`clicks`, postojeće politike za staff/agencije nepromenjene. Napomena: RLS je red-level, ne column-level — aplikacija koja čita preko `anon` ključa mora sama da bira samo javna polja u `select()`, interna polja (`confidence_score`, `upload_id`...) su tehnički dostupna na `published` redovima ako se eksplicitno zatraže.
