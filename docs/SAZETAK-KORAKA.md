@@ -94,6 +94,8 @@ Baza je do sad bila zaključana za svakoga ko nije ulogovan. Sad je na njoj napr
 
 **Zašto je bitno**: sajt mora odnekud da čita ponude, a ovo je način da javnost vidi samo ono što sme, uz zaštitu na nivou same baze (ne samo u kodu sajta).
 
+Dopuna Koraka 1: posetilac sada može da vidi i **ime agencije** uz ponudu ("Izvor: Agencija A"), ali samo ime — ništa drugo o agenciji (cene naplate, PIB, kontakt) nije dostupno javnosti, i to je zaključano u samoj bazi. Vidi se samo ime agencije koja ima bar jednu objavljenu ponudu.
+
 ### Korak 2 — Prazan nov sajt, spreman za građenje
 
 Stari sajt je bio samo maketa sa izmišljenim apartmanima. Zamenjen je novim, praznim temeljom — istim alatom kao admin deo — koji je već povezan sa bazom, ali za sada prikazuje samo naslov "Slobodno". Sajt čita bazu isključivo "sa svoje strane" (server), pa posetiočev pregledač nikad ne razgovara direktno sa bazom. Izgled se pravi tek kad bude gotov dizajn.
