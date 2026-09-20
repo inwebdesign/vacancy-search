@@ -17,13 +17,16 @@ Replika Eponuda modela za turizam: korisnik na sajtu pretražuje po destinaciji/
 
 ## Koraci
 
-### Korak 1 — RLS politika za javno čitanje
+### Korak 1 — RLS politika za javno čitanje (gotovo)
 
-Nova migracija u `apps/admin/prisma/migrations`: `offers_select_public` policy, `FOR SELECT TO anon USING (status = 'published')`.
+Migracija `20260920100000_public_offers_select` u `apps/admin/prisma/migrations`: `offers_select_public` policy, `FOR SELECT TO anon USING (status = 'published')`. Primenjena na dev bazu.
 
-Test (isti obrazac kao za sve dosadašnje RLS izmene): simulacija anonimne (bez JWT-a/`anon` role) sesije na dev bazi — potvrditi da se vide SAMO `published` redovi, ni `pending_review` ni `paused` ni interne kolone poput `confidence_score`/`upload_id` ne smeju biti dostupne mimo onoga što app eksplicitno traži u `select()`.
+Testirano direktno na dev bazi (simulacija `anon` role bez JWT-a, u transakciji, čisto SELECT upiti pa nema šta da se vraća nazad):
+- `anon` čita `offers` → vidi SAMO `published` (69/69, tačno se poklapa sa stvarnim brojem u bazi u trenutku testa), ni `pending_review` ni `paused` ni `expired` nisu vidljivi.
+- `anon` pokušava `uploads`/`clicks` → 0 redova (nema politike za te tabele, ispravno blokirano).
+- Sanity: `agency_user` i `superadmin` i dalje vide isto što i pre (postojeće politike netaknute — nova politika je čist dodatak, RLS politike unutar istog `FOR SELECT` se OR-uju).
 
-**Kriterijum završetka**: anonimna sesija čita objavljene ponude, ne čita ništa drugo; postojeće role (staff/agencije) rade nepromenjeno.
+**Napomena**: politika ne ograničava KOJE kolone `anon` vidi (RLS je red-level, ne column-level) — interna polja poput `confidence_score`/`upload_id` su tehnički dostupna anon roli na `published` redovima ako ih neko eksplicitno zatraži u `select()`. Aplikacija (Next.js sajt, Korak 3) mora sama da traži samo javna polja — ovo je odgovornost na nivou koda, ne baze, vredi imati na umu pri pisanju upita.
 
 ### Korak 2 — Next.js skelet za `apps/site`
 
