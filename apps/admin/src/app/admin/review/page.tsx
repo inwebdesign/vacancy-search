@@ -41,7 +41,7 @@ export default async function ReviewPage({
   let offersQuery = supabase
     .from("offers")
     .select(
-      "id, naziv, destinacija, datum_polaska, datum_povratka, cena_eur, max_gostiju, dostupno_mesta, kontakt_url, confidence_score, agencies(naziv)",
+      "id, naziv, destinacija, datum_polaska, datum_povratka, cena_eur, cena_tip, cena_po_osobi, max_gostiju, dostupno_mesta, kontakt_url, confidence_score, agencies(naziv)",
       { count: "exact" },
     )
     .eq("status", "pending_review")

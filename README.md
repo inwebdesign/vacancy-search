@@ -33,6 +33,7 @@ npm run build:admin
 
 ```bash
 npm run test:site
+npm run test:admin
 ```
 
 Detalji o svakoj aplikaciji (funkcionalnosti, environment varijable, struktura) nalaze se u README fajlu odgovarajućeg foldera.

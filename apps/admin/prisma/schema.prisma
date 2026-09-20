@@ -132,6 +132,18 @@ enum OfferStatus {
   @@map("offer_status")
 }
 
+// Cena po osobi vs cena za smeštajnu jedinicu (docs/PLAN-JAVNI-SAJT.md, Korak 3).
+// Bez ovoga "najjeftinije prvo" poredi neuporedive iznose. Uz kolonu postoji
+// i IZVEDENA offers.cena_po_osobi (GENERATED STORED: po_jedinici -> cena_eur /
+// max_gostiju, inače cena_eur) — namerno nije modelovana ovde jer Prisma ne
+// podržava generisane kolone; živi samo u migraciji 20260921100000_offer_cena_tip.
+enum CenaTip {
+  po_osobi
+  po_jedinici
+
+  @@map("cena_tip")
+}
+
 model Offer {
   id               String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   agencyId         String      @map("agency_id") @db.Uuid
@@ -141,6 +153,7 @@ model Offer {
   datumPolaska     DateTime    @map("datum_polaska") @db.Date
   datumPovratka    DateTime    @map("datum_povratka") @db.Date
   cenaEur          Decimal     @map("cena_eur") @db.Decimal(10, 2)
+  cenaTip          CenaTip     @default(po_osobi) @map("cena_tip")
   maxGostiju       Int         @map("max_gostiju")
   // Nullable — Faza 2, Korak 4: PDF cenovnici obično uopšte ne navode broj
   // slobodnih mesta, samo cenu po tipu sobe. UI prikaz za "nepoznato" nije

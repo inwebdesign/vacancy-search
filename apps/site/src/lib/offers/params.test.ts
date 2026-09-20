@@ -10,6 +10,8 @@ describe("parseSearchParams", () => {
   it("prazan ulaz daje podrazumevane vrednosti", () => {
     expect(parseSearchParams({})).toEqual({
       destinacija: undefined,
+      naziv: undefined,
+      cenaTip: undefined,
       datumOd: undefined,
       datumDo: undefined,
       brojGostiju: undefined,
@@ -22,6 +24,26 @@ describe("parseSearchParams", () => {
     expect(parseSearchParams({ destinacija: "Par*alia" }).destinacija).toBe("Paralia");
     expect(parseSearchParams({ destinacija: "   " }).destinacija).toBeUndefined();
     expect(parseSearchParams({ destinacija: "***" }).destinacija).toBeUndefined();
+  });
+
+  it("naziv: isto čišćenje kao destinacija", () => {
+    expect(parseSearchParams({ naziv: "  Vila   Estia " }).naziv).toBe("Vila Estia");
+    expect(parseSearchParams({ naziv: "Est*ia" }).naziv).toBe("Estia");
+    expect(parseSearchParams({ naziv: "   " }).naziv).toBeUndefined();
+    expect(parseSearchParams({ naziv: "b".repeat(300) }).naziv).toHaveLength(100);
+    // destinacija i naziv su nezavisni filteri
+    expect(parseSearchParams({ destinacija: "Paralia", naziv: "Estia" })).toMatchObject({
+      destinacija: "Paralia",
+      naziv: "Estia",
+    });
+  });
+
+  it("cenaTip: samo tačne vrednosti, sve ostalo se izbacuje", () => {
+    expect(parseSearchParams({ cenaTip: "po_osobi" }).cenaTip).toBe("po_osobi");
+    expect(parseSearchParams({ cenaTip: "po_jedinici" }).cenaTip).toBe("po_jedinici");
+    for (const bad of ["", "po osobi", "PO_OSOBI", "sve", "1", "po_osobi;drop"]) {
+      expect(parseSearchParams({ cenaTip: bad }).cenaTip).toBeUndefined();
+    }
   });
 
   it("destinacija: ograničena dužina (100)", () => {

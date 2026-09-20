@@ -37,6 +37,8 @@ describe("oblik rezultata", () => {
         "agencija",
         "azurirano",
         "cenaEur",
+        "cenaPoOsobi",
+        "cenaTip",
         "datumPolaska",
         "datumPovratka",
         "destinacija",
@@ -49,9 +51,21 @@ describe("oblik rezultata", () => {
     for (const o of ALL) expect(typeof o.agencija).toBe("string");
   });
 
+  it("izvedena cena po osobi je tačna za oba tipa cene", () => {
+    for (const o of ALL) {
+      expect(["po_osobi", "po_jedinici"]).toContain(o.cenaTip);
+      const expected =
+        o.cenaTip === "po_jedinici"
+          ? Math.round((o.cenaEur / Math.max(o.maxGostiju, 1)) * 100) / 100
+          : o.cenaEur;
+      expect(o.cenaPoOsobi).toBeCloseTo(expected, 2);
+    }
+  });
+
   it("brojevi su brojevi, datumi YYYY-MM-DD", () => {
     for (const o of ALL) {
       expect(typeof o.cenaEur).toBe("number");
+      expect(typeof o.cenaPoOsobi).toBe("number");
       expect(typeof o.maxGostiju).toBe("number");
       expect(o.datumPolaska).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       expect(o.datumPovratka).toMatch(/^\d{4}-\d{2}-\d{2}$/);
@@ -60,12 +74,12 @@ describe("oblik rezultata", () => {
 });
 
 describe("redosled i paginacija", () => {
-  it("najjeftinije prvo, stabilno (isti iznos → po id) kroz sve strane", () => {
+  it("najjeftinije prvo po ceni PO OSOBI, stabilno (isti iznos → po id) kroz sve strane", () => {
     for (let i = 1; i < ALL.length; i++) {
       const a = ALL[i - 1];
       const b = ALL[i];
-      expect(a.cenaEur <= b.cenaEur).toBe(true);
-      if (a.cenaEur === b.cenaEur) expect(a.id < b.id).toBe(true);
+      expect(a.cenaPoOsobi <= b.cenaPoOsobi).toBe(true);
+      if (a.cenaPoOsobi === b.cenaPoOsobi) expect(a.id < b.id).toBe(true);
     }
   });
 
@@ -110,6 +124,62 @@ describe("destinacija", () => {
   it("navodnik, zagrade i zarez u unosu ne kvare upit", async () => {
     const r = await searchOffers(P({ destinacija: `a"b),c(d` }), { today: ALL_TIME });
     expect(r.total).toBe(0);
+  });
+});
+
+describe("naziv apartmana", () => {
+  it("sadrži tekst, bez obzira na velika/mala slova, nezavisno od destinacije", async () => {
+    const q = ALL[0].naziv.slice(2, 7).toUpperCase();
+    const expected = ALL.filter((o) => o.naziv.toLowerCase().includes(q.toLowerCase()));
+    expect(expected.length).toBeGreaterThan(0);
+    const { all, total } = await fetchAll({ naziv: q });
+    expect(total).toBe(expected.length);
+    expect(all.map((o) => o.id).sort()).toEqual(expected.map((o) => o.id).sort());
+  });
+
+  it("naziv + destinacija su AND", async () => {
+    const o = ALL[0];
+    const nq = o.naziv.slice(0, 4);
+    const dq = o.destinacija.slice(0, 3);
+    const expected = ALL.filter(
+      (x) =>
+        x.naziv.toLowerCase().includes(nq.toLowerCase()) &&
+        x.destinacija.toLowerCase().includes(dq.toLowerCase()),
+    );
+    const r = await searchOffers(P({ naziv: nq, destinacija: dq }), { today: ALL_TIME });
+    expect(r.total).toBe(expected.length);
+  });
+
+  it("nema poklapanja, doslovni %/_ i navodnici ne kvare upit", async () => {
+    expect((await searchOffers(P({ naziv: "zzzqqq" }), { today: ALL_TIME })).total).toBe(0);
+    for (const ch of ["%", "_", `a"b),c(d`]) {
+      const expected = ALL.filter((o) => o.naziv.includes(ch)).length;
+      expect((await searchOffers(P({ naziv: ch }), { today: ALL_TIME })).total).toBe(expected);
+    }
+  });
+});
+
+describe("tip cene (po osobi / za jedinicu)", () => {
+  it("filter vraća samo traženi tip, tačno isto kao JS filter", async () => {
+    for (const tip of ["po_osobi", "po_jedinici"] as const) {
+      const expected = ALL.filter((o) => o.cenaTip === tip);
+      const { all, total } = await fetchAll({ cenaTip: tip });
+      expect(total, tip).toBe(expected.length);
+      for (const o of all) expect(o.cenaTip).toBe(tip);
+    }
+  });
+
+  it("dva tipa zajedno čine ceo skup (nema izgubljenih ni dupliranih)", async () => {
+    const a = (await searchOffers(P({ cenaTip: "po_osobi" }), { today: ALL_TIME })).total;
+    const b = (await searchOffers(P({ cenaTip: "po_jedinici" }), { today: ALL_TIME })).total;
+    expect(a + b).toBe(ALL.length);
+  });
+
+  it("kombinacija sa ostalim filterima", async () => {
+    const tip = ALL[0].cenaTip;
+    const expected = ALL.filter((o) => o.cenaTip === tip && o.maxGostiju >= 2);
+    const r = await searchOffers(P({ cenaTip: tip, brojGostiju: 2 }), { today: ALL_TIME });
+    expect(r.total).toBe(expected.length);
   });
 });
 
@@ -195,6 +265,16 @@ describe("ugovor sa bazom (RLS + column grant za anon)", () => {
     expect(error).toBeNull();
     expect(data!.length).toBeGreaterThan(0);
     for (const r of data!) expect(r.status).toBe("published");
+  });
+
+  it("nove javne kolone (cena_tip, cena_po_osobi) su čitljive, filtriranje i sortiranje po njima radi", async () => {
+    const { error } = await sb
+      .from("offers")
+      .select("cena_tip, cena_po_osobi")
+      .eq("cena_tip", "po_jedinici")
+      .order("cena_po_osobi")
+      .limit(1);
+    expect(error).toBeNull();
   });
 
   it.each(["upload_id", "confidence_score", "published_at", "created_at", "kontakt_url", "*"])(

@@ -1,12 +1,18 @@
 import "server-only";
 import { createPublicClient } from "@/lib/supabase/public";
-import { PAGE_SIZE, escapeLike, todayInBelgrade, type SearchParams } from "./params";
+import {
+  PAGE_SIZE,
+  escapeLike,
+  todayInBelgrade,
+  type CenaTip,
+  type SearchParams,
+} from "./params";
 
 // Jedini spisak kolona koje sajt traži. Mora da ostane podskup javnih kolona
 // iz migracije 20260920120000_public_offers_column_grant — `select *` bi
 // pukao sa "permission denied". agency_id/status se ne traže (tehničke su).
 const PUBLIC_OFFER_COLUMNS =
-  "id, naziv, destinacija, datum_polaska, datum_povratka, cena_eur, max_gostiju, dostupno_mesta, updated_at, agencies(naziv)";
+  "id, naziv, destinacija, datum_polaska, datum_povratka, cena_eur, cena_tip, cena_po_osobi, max_gostiju, dostupno_mesta, updated_at, agencies(naziv)";
 
 export type PublicOffer = {
   id: string;
@@ -14,7 +20,9 @@ export type PublicOffer = {
   destinacija: string;
   datumPolaska: string;
   datumPovratka: string;
-  cenaEur: number;
+  cenaEur: number; // cena onako kako je agencija navela (vidi cenaTip)
+  cenaTip: CenaTip;
+  cenaPoOsobi: number; // izvedena, uporediva cena po osobi (jedinica / max gostiju)
   maxGostiju: number;
   dostupnoMesta: number | null;
   azurirano: string; // ISO vreme, za pečat "ažurirano pre X"
@@ -36,6 +44,8 @@ type Row = {
   datum_polaska: string;
   datum_povratka: string;
   cena_eur: number;
+  cena_tip: CenaTip;
+  cena_po_osobi: number;
   max_gostiju: number;
   dostupno_mesta: number | null;
   updated_at: string;
@@ -43,12 +53,16 @@ type Row = {
 };
 
 // Pretraga objavljenih ponuda. Filteri su svi opcioni:
-// - destinacija: sadrži uneti tekst, bez obzira na velika/mala slova
+// - destinacija, naziv: sadrže uneti tekst, bez obzira na velika/mala slova
+//   (naziv = apartman/vila: isto smeštajno mesto nude i druge agencije)
+// - cenaTip: samo cene po osobi ili samo cene za celu jedinicu
 // - datumi: PREKLAPANJE perioda ponude sa traženim periodom (polazak <= do
 //   I povratak >= od); sa samo jednim datumom važi samo odgovarajuća strana
 // - brojGostiju: ponuda prima bar toliko gostiju (max_gostiju >= traženo)
 // Uvek: samo published, ne prošli polazak, ne rasprodato (dostupno_mesta = 0).
-// Redosled: najjeftinije prvo; id kao drugi ključ da paginacija bude stabilna.
+// Redosled: najjeftinije prvo po IZVEDENOJ ceni po osobi (cena_po_osobi — za
+// cenu "za jedinicu" to je cena / max_gostiju pri punom popunjenju), da se
+// uporede uporedivi iznosi; id kao drugi ključ da paginacija bude stabilna.
 // `today` se može zadati (testovi); podrazumevano je danas u Srbiji.
 export async function searchOffers(
   params: SearchParams,
@@ -63,13 +77,17 @@ export async function searchOffers(
     .eq("status", "published")
     .gte("datum_polaska", today)
     .or("dostupno_mesta.is.null,dostupno_mesta.gt.0")
-    .order("cena_eur", { ascending: true })
+    .order("cena_po_osobi", { ascending: true })
     .order("id", { ascending: true })
     .range(from, from + PAGE_SIZE - 1);
 
   if (params.destinacija) {
     query = query.ilike("destinacija", `%${escapeLike(params.destinacija)}%`);
   }
+  if (params.naziv) {
+    query = query.ilike("naziv", `%${escapeLike(params.naziv)}%`);
+  }
+  if (params.cenaTip) query = query.eq("cena_tip", params.cenaTip);
   if (params.datumOd) query = query.gte("datum_povratka", params.datumOd);
   if (params.datumDo) query = query.lte("datum_polaska", params.datumDo);
   if (params.brojGostiju) query = query.gte("max_gostiju", params.brojGostiju);
@@ -101,6 +119,8 @@ export async function searchOffers(
       datumPolaska: r.datum_polaska,
       datumPovratka: r.datum_povratka,
       cenaEur: r.cena_eur,
+      cenaTip: r.cena_tip,
+      cenaPoOsobi: r.cena_po_osobi,
       maxGostiju: r.max_gostiju,
       dostupnoMesta: r.dostupno_mesta,
       azurirano: r.updated_at,

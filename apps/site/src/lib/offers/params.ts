@@ -3,12 +3,16 @@
 // nevažeća vrednost se tiho izbacuje (ne baca grešku), pretraga radi bez nje.
 
 export const PAGE_SIZE = 20;
-const MAX_DESTINACIJA_LEN = 100;
+const MAX_TEXT_LEN = 100;
 const MAX_GOSTIJU = 30;
 const MAX_PAGE = 500; // sprečava beskorisno duboke offset upite
 
+export type CenaTip = "po_osobi" | "po_jedinici";
+
 export type SearchParams = {
   destinacija?: string;
+  naziv?: string; // naziv apartmana/vile — isti apartman nude i druge agencije
+  cenaTip?: CenaTip; // samo cene po osobi, ili samo cene za celu jedinicu
   datumOd?: string; // YYYY-MM-DD
   datumDo?: string; // YYYY-MM-DD
   brojGostiju?: number;
@@ -39,15 +43,26 @@ function parsePositiveInt(
   return n >= 1 && n <= max ? n : undefined;
 }
 
-export function parseSearchParams(raw: RawParams): SearchParams {
-  // "*" bi PostgREST protumačio kao džoker u LIKE obrascu — izbacuje se.
-  const destinacija =
-    first(raw.destinacija)
+// Slobodan tekst iz URL-a: "*" bi PostgREST protumačio kao džoker u LIKE
+// obrascu (izbacuje se), razmaci se sažimaju, dužina je ograničena.
+function cleanText(v: string | undefined): string | undefined {
+  return (
+    v
       ?.replace(/\*/g, "")
       .replace(/\s+/g, " ")
       .trim()
-      .slice(0, MAX_DESTINACIJA_LEN)
-      .trim() || undefined;
+      .slice(0, MAX_TEXT_LEN)
+      .trim() || undefined
+  );
+}
+
+function parseCenaTip(v: string | undefined): CenaTip | undefined {
+  return v === "po_osobi" || v === "po_jedinici" ? v : undefined;
+}
+
+export function parseSearchParams(raw: RawParams): SearchParams {
+  const destinacija = cleanText(first(raw.destinacija));
+  const naziv = cleanText(first(raw.naziv));
 
   let datumOd = parseDate(first(raw.datumOd));
   let datumDo = parseDate(first(raw.datumDo));
@@ -57,6 +72,8 @@ export function parseSearchParams(raw: RawParams): SearchParams {
 
   return {
     destinacija,
+    naziv,
+    cenaTip: parseCenaTip(first(raw.cenaTip)),
     datumOd,
     datumDo,
     brojGostiju: parsePositiveInt(first(raw.brojGostiju), MAX_GOSTIJU),
