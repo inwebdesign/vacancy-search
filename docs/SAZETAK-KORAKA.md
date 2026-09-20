@@ -84,4 +84,20 @@ Napomena: ovo još nije povezano sa pravim javnim sajtom (ta veza dolazi posebno
 
 **Zašto je bitno**: ovo je osnova za naplatu (plaćanje po kliku). Bez tačnog brojanja, ne može se pravično naplatiti agencijama niti sprečiti lažno naduvavanje brojki.
 
+## Javni sajt — uvezivanje sa bazom (u toku)
+
+Do sad je sve građeno "iza scene" — agencije šalju cenovnike, tim ih proverava. Ovaj deo pravi ono što vide obični posetioci: sajt gde se traži smeštaj i porede ponude više agencija (kao Eponuda, samo za turizam). Plan: `docs/PLAN-JAVNI-SAJT.md`.
+
+### Korak 1 — Prozor za prolaznike
+
+Baza je do sad bila zaključana za svakoga ko nije ulogovan. Sad je na njoj napravljen "izlog": neko ko nije ulogovan može da pogleda samo ponude koje su već objavljene — ništa drugo. Ponude koje čekaju proveru, podaci o klikovima, agencijama ili uploadima ostaju potpuno nevidljivi. Niko spolja ne može ništa da promeni ili obriše.
+
+**Zašto je bitno**: sajt mora odnekud da čita ponude, a ovo je način da javnost vidi samo ono što sme, uz zaštitu na nivou same baze (ne samo u kodu sajta).
+
+### Korak 2 — Prazan nov sajt, spreman za građenje
+
+Stari sajt je bio samo maketa sa izmišljenim apartmanima. Zamenjen je novim, praznim temeljom — istim alatom kao admin deo — koji je već povezan sa bazom, ali za sada prikazuje samo naslov "Slobodno". Sajt čita bazu isključivo "sa svoje strane" (server), pa posetiočev pregledač nikad ne razgovara direktno sa bazom. Izgled se pravi tek kad bude gotov dizajn.
+
+**Zašto je bitno**: ovo je temelj na kom se grade pretraga i rezultati, i zbog izbora alata sajt će moći da se dobro pozicionira na Google-u.
+
 ### Faza 3, 4, 5 — *(dolazi)*

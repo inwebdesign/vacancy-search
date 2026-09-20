@@ -28,7 +28,15 @@ Testirano direktno na dev bazi (simulacija `anon` role bez JWT-a, u transakciji,
 
 **Napomena**: politika ne ograničava KOJE kolone `anon` vidi (RLS je red-level, ne column-level) — interna polja poput `confidence_score`/`upload_id` su tehnički dostupna anon roli na `published` redovima ako ih neko eksplicitno zatraži u `select()`. Aplikacija (Next.js sajt, Korak 3) mora sama da traži samo javna polja — ovo je odgovornost na nivou koda, ne baze, vredi imati na umu pri pisanju upita.
 
-### Korak 2 — Next.js skelet za `apps/site`
+### Korak 2 — Next.js skelet za `apps/site` (gotovo)
+
+**Urađeno**: stari Vite skelet uklonjen (ostaje u git istoriji), novi Next.js 15 App Router (TypeScript, Tailwind, ESLint — preslikana admin konfiguracija), server-only Supabase klijent `src/lib/supabase/public.ts` (anon ključ, bez sesije), `.env.example`, README. Port `3001` (admin je na 3000). `apps/site/node_modules` obrisan i instalirano iz root-a — sad postoji samo jedna verzija Reacta u monorepo-u (19.x), čime nestaje uzrok ranijeg "duplirane React verzije" build buga iz `apps/admin/README.md` (site je bio na React 18).
+
+**Provereno**: `tsc`, `lint`, `npm run build` prolaze za site i (posle `npm install`) za admin; `GET /` vraća 200. Pravi end-to-end test kroz Next server + anon ključ + PostgREST (privremena debug ruta, obrisana): vidi se 69 `published` ponuda, a 0 redova iz `pending_review`/`paused`/`expired`, `uploads`, `clicks`, `agencies`, `profiles`, `audit_log` — potvrda da Korak 1 politika radi i preko pravog API puta, ne samo u SQL simulaciji.
+
+**Dva nalaza iz testa — treba odluka pre Koraka 3:**
+1. **Ime agencije na kartici nije dostupno anon roli.** `agencies` tabela nema javnu politiku (0 redova), pa upit `offers` + `agencies(naziv)` vraća `null` za agenciju. Kartica treba da prikaže izvor ("Izvor: Aqua Travel"), a `agencies` sadrži i osetljiva polja (`cpc_cena`, `mesecni_budzet_klikova`, `pib`). Opcije: (a) javna politika na `agencies` + column-level GRANT samo na `id, naziv`; (b) denormalizovano `agency_naziv` na `offers`; (c) sajt čita `agencies` server-side preko `service_role` samo za `naziv`.
+2. **Anon ključ je javan po dizajnu** — nalazi se i u browser bundle-u admin login stranice, pa iko može da gađa PostgREST direktno, mimo sajta. Posle Koraka 1 to znači da svako može da pročita objavljene redove sa SVIM kolonama (`confidence_score`, `upload_id`, `agency_id`), ne samo one koje sajt traži. Podaci o samoj ponudi su ionako javni (prikazuju se na sajtu), pa je rizik nizak, ali "korisnik nikad ne dodiruje bazu" u strogom smislu važi samo za pisanje. Predlog: column-level grant za `anon` (`REVOKE SELECT ON offers FROM anon; GRANT SELECT (javne kolone) ON offers TO anon;`) — baza sama sprečava čitanje internih kolona čak i direktnim pozivom, i nema više opasnosti od `select('*')`.
 
 - Brisanje starog Vite skeleta (`index.html`, `vite.config.js`, `src/main.jsx`, `src/VacancySearch.jsx`, stari `package.json`).
 - Novi Next.js App Router projekat, isti alati kao admin (TypeScript, Tailwind, ESLint).

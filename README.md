@@ -2,8 +2,10 @@
 
 Monorepo sa dve aplikacije:
 
-- [`apps/site`](apps/site/README.md) — javna stranica za pretragu slobodnog smeštaja (React + Vite)
+- [`apps/site`](apps/site/README.md) — javni sajt za pretragu ponuda agencija (Next.js + Supabase, čita bazu samo sa servera)
 - [`apps/admin`](apps/admin/README.md) — interni admin dashboard za agencije (Next.js + Prisma + Supabase)
+
+Plan uvezivanja javnog sajta sa bazom: [`docs/PLAN-JAVNI-SAJT.md`](docs/PLAN-JAVNI-SAJT.md).
 
 ## Setup
 
@@ -16,7 +18,7 @@ Instalacija se pokreće jednom iz korena — `npm` workspaces instalira zavisnos
 ## Pokretanje
 
 ```bash
-npm run dev:site    # http://localhost:5173
+npm run dev:site    # http://localhost:3001
 npm run dev:admin   # http://localhost:3000
 ```
 
