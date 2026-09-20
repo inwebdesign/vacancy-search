@@ -114,4 +114,10 @@ Motor je proveren sa 46 automatskih testova, uključujući proveru da svaki filt
 
 **Zašto je bitno**: ovo je "mozak" sajta. Kad stigne dizajn, ostaje samo da se motor poveže sa lepim izgledom — logika je već gotova i proverena.
 
+Dopuna Koraka 3 — dve stvari koje se pokazale kao važne:
+
+**Isti apartman, više agencija.** Pretraga sada može da traži i po nazivu apartmana, ne samo po mestu. Razlog: isti apartman često nudi više agencija (npr. manja agencija preuzme ponudu velike agencije i okači je na svoj sajt) — posetilac tako može da ih uporedi jednu pored druge.
+
+**Cena po osobi ili za celu sobu.** U cenovniku postoje dve vrste cena koje izgledaju isto, a nisu: negde piše cena za jednu osobu, negde cena za celu sobu (bez obzira koliko ljudi spava u njoj). Kad bi se poređale zajedno, "najjeftinije" bi bilo pogrešno — kao da porediš cenu jedne kifle sa cenom cele kese. Zato svaka ponuda sada zna kojoj vrsti pripada, a sistem izračuna i "otprilike koliko je to po osobi" da bi poređenje bilo pošteno. Posetilac će moći da filtrira samo jednu vrstu. Veštačka inteligencija koja čita PDF sama odlučuje o vrsti iz naslova tabele — proverena je na pravom cenovniku, pogodila je svih 156 od 156. Kad nije sigurna, ne pogađa nego šalje ponudu na ručnu proveru.
+
 ### Faza 3, 4, 5 — *(dolazi)*

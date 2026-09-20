@@ -65,6 +65,10 @@ offers
   --   naknadno (Faza 2, Korak 4): ista destinacija+datum polaska može imati više
   --   ponuda iz istog PDF cenovnika (različiti tipovi soba/vila), naziv ih razlikuje
   -- dostupno_mesta je nullable — PDF cenovnici obično ne navode broj slobodnih mesta
+  -- cena_tip enum: po_osobi | po_jedinici (default po_osobi) — dodato naknadno: PDF cenovnik
+  --   ima cenu po osobi i cenu za celu smeštajnu jedinicu, koje nisu uporedive
+  -- cena_po_osobi: IZVEDENA (GENERATED STORED) — po_jedinici: cena_eur / max_gostiju, inače
+  --   cena_eur; po njoj se sortira/poredi na javnom sajtu
   -- status enum: pending_review, published, paused, rejected, expired
   --   "paused" dodat naknadno, van originalnog plana — agencija privremeno skida
   --   svoju objavljenu ponudu sa sajta bez gubljenja podataka (npr. popunjen kapacitet)

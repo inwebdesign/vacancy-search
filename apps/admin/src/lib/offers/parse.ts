@@ -1,6 +1,7 @@
 import "server-only";
 import Papa from "papaparse";
 import ExcelJS from "exceljs";
+import { parseCenaTip, type CenaTip } from "./cena-tip";
 
 // Faza 2, Korak 3: fuzzy column-mapping (brief sekcija 8) — kolone iz
 // template-a (agencija_id, naziv_aranzmana, destinacija, datum_polaska,
@@ -38,12 +39,17 @@ const COLUMN_SYNONYMS: Record<RequiredField, string[]> = {
   kontaktUrl: ["kontakt_url", "link", "url", "sajt"],
 };
 
+// Opciona kolona — nije obavezna (brief template ima samo cena_po_osobi_eur),
+// pa njeno odsustvo NE znači "nedostaje kolona". Bez nje, cena je po osobi.
+const CENA_TIP_SYNONYMS = ["cena_tip", "tip_cene", "vrsta_cene", "price_type"];
+
 export type ParsedOffer = {
   naziv: string;
   destinacija: string;
   datumPolaska: string; // YYYY-MM-DD
   datumPovratka: string;
   cenaEur: number;
+  cenaTip: CenaTip;
   maxGostiju: number;
   dostupnoMesta: number;
   kontaktUrl: string;
@@ -67,7 +73,7 @@ function normalizeHeader(h: string): string {
 
 function mapColumns(headers: string[]) {
   const normalized = headers.map(normalizeHeader);
-  const mapping: Partial<Record<RequiredField, string>> = {};
+  const mapping: Partial<Record<RequiredField | "cenaTip", string>> = {};
   const missing: RequiredField[] = [];
 
   for (const field of REQUIRED_FIELDS) {
@@ -78,6 +84,9 @@ function mapColumns(headers: string[]) {
       mapping[field] = headers[idx];
     }
   }
+  const tipIdx = normalized.findIndex((h) => CENA_TIP_SYNONYMS.includes(h));
+  if (tipIdx !== -1) mapping.cenaTip = headers[tipIdx];
+
   return { mapping, missing };
 }
 
@@ -136,7 +145,7 @@ function parseWholeNumber(value: unknown): number | null {
 // razgovor/README) — trenutno se samo broje i prijavljuju.
 function buildRow(
   raw: Record<string, unknown>,
-  mapping: Partial<Record<RequiredField, string>>,
+  mapping: Partial<Record<RequiredField | "cenaTip", string>>,
 ): ParsedOffer | null {
   const naziv = mapping.naziv ? String(raw[mapping.naziv] ?? "").trim() : "";
   const destinacija = mapping.destinacija
@@ -158,6 +167,14 @@ function buildRow(
   const kontaktUrl = mapping.kontaktUrl
     ? String(raw[mapping.kontaktUrl] ?? "").trim()
     : "";
+  // Prazna ćelija (ili nepostojeća kolona) = po osobi; popunjena a nejasna
+  // vrednost = red se preskače (CSV/Excel se objavljuje bez review-a, pa se
+  // tip cene ne sme pogađati).
+  const rawTip = mapping.cenaTip ? raw[mapping.cenaTip] : undefined;
+  const cenaTip: CenaTip | null =
+    rawTip === undefined || rawTip === null || String(rawTip).trim() === ""
+      ? "po_osobi"
+      : parseCenaTip(String(rawTip));
 
   if (
     !naziv ||
@@ -165,6 +182,7 @@ function buildRow(
     !datumPolaska ||
     !datumPovratka ||
     cenaEur === null ||
+    cenaTip === null ||
     maxGostiju === null ||
     dostupnoMesta === null ||
     !kontaktUrl
@@ -178,6 +196,7 @@ function buildRow(
     datumPolaska,
     datumPovratka,
     cenaEur,
+    cenaTip,
     maxGostiju,
     dostupnoMesta,
     kontaktUrl,

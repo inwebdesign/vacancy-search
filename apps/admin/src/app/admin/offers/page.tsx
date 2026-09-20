@@ -6,6 +6,7 @@ import { buildOfferSearchOr } from "@/lib/search-filter";
 import { UploadForm } from "./UploadForm";
 import { OfferStatusControl } from "./OfferStatusControl";
 import { OfferKontaktUrlControl } from "./OfferKontaktUrlControl";
+import { CENA_TIP_LABEL, type CenaTip } from "@/lib/offers/cena-tip";
 
 const STATUS_OPTIONS = [
   { value: "pending_review", label: "Čeka pregled" },
@@ -85,7 +86,7 @@ export default async function OffersPage({
   let offersQuery = supabase
     .from("offers")
     .select(
-      "id, naziv, destinacija, datum_polaska, datum_povratka, cena_eur, status, confidence_score, dostupno_mesta, kontakt_url",
+      "id, naziv, destinacija, datum_polaska, datum_povratka, cena_eur, cena_tip, cena_po_osobi, status, confidence_score, dostupno_mesta, kontakt_url",
       { count: "exact" },
     )
     .order("updated_at", { ascending: false })
@@ -155,7 +156,14 @@ export default async function OffersPage({
               <td className="py-2 pr-4 text-gray-500">
                 {o.datum_polaska} — {o.datum_povratka}
               </td>
-              <td className="py-2 pr-4">{o.cena_eur}€</td>
+              <td className="py-2 pr-4">
+                {o.cena_eur}€{" "}
+                <span className="text-xs text-gray-500">
+                  {CENA_TIP_LABEL[o.cena_tip as CenaTip] ?? o.cena_tip}
+                  {o.cena_tip === "po_jedinici" &&
+                    ` (≈ ${o.cena_po_osobi} €/os.)`}
+                </span>
+              </td>
               <td className="py-2 pr-4">
                 <OfferStatusControl
                   offerId={o.id}

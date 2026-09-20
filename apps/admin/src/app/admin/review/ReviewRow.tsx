@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { reviewOffer } from "./actions";
+import { CENA_TIP_LABEL, type CenaTip } from "@/lib/offers/cena-tip";
 
 type Offer = {
   id: string;
@@ -10,6 +11,8 @@ type Offer = {
   datum_polaska: string;
   datum_povratka: string;
   cena_eur: number;
+  cena_tip: CenaTip;
+  cena_po_osobi: number;
   max_gostiju: number;
   dostupno_mesta: number | null;
   kontakt_url: string;
@@ -76,7 +79,17 @@ export function ReviewRow({ offer }: { offer: Offer }) {
       <td className="py-2 pr-2">{field("destinacija")}</td>
       <td className="py-2 pr-2">{field("datum_polaska", "date")}</td>
       <td className="py-2 pr-2">{field("datum_povratka", "date")}</td>
-      <td className="w-20 py-2 pr-2">{field("cena_eur", "number")}</td>
+      <td className="w-24 py-2 pr-2">
+        {field("cena_eur", "number")}
+        <div
+          className="mt-0.5 text-xs text-gray-500"
+          title="Tip cene određuje AI iz cenovnika — nije editabilno (ako je pogrešan, odbij ponudu)"
+        >
+          {CENA_TIP_LABEL[offer.cena_tip]}
+          {offer.cena_tip === "po_jedinici" &&
+            ` (≈ ${offer.cena_po_osobi} €/os.)`}
+        </div>
+      </td>
       <td className="w-16 py-2 pr-2 text-gray-500" title="Izvedeno iz šifre sobe u nazivu — nije editabilno (tech debt: možda vratiti kao editabilno)">
         {offer.max_gostiju}
       </td>
