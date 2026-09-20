@@ -5,3 +5,6 @@ dist
 package-lock.json
 *.pem
 
+# Lokalni Claude skill sa pravilima za objašnjavanje — za sada samo na ovom računaru
+.claude/skills/objasnjavanje/
+
