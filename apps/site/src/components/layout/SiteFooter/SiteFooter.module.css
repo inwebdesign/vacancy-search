@@ -1,0 +1,33 @@
+.footer {
+  background: var(--c-ink);
+}
+
+.inner {
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: 22px var(--gutter-desktop);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.note {
+  margin: 0;
+  font: 400 13px var(--font-sans);
+  color: var(--c-text-on-dark-muted);
+}
+
+.links {
+  display: flex;
+  gap: 18px;
+  font: 600 13px var(--font-sans);
+  color: var(--c-yellow);
+}
+
+@media (max-width: 640px) {
+  .inner {
+    padding: 22px var(--gutter-mobile);
+  }
+}

@@ -1,0 +1,51 @@
+:root {
+  /* brend */
+  --c-yellow: #ffcc00;
+  --c-ink: #2b2b28;
+  --c-ink-on-yellow: #4a3d00;
+
+  /* tekst */
+  --c-text: #3f3f38;
+  --c-text-muted: #67675e;
+  --c-text-disabled: #9b9b90;
+  --c-link: #1f6fb2;
+  /* Nije u README tabeli boja ni u polaznom popisu tokena — postoji samo u
+     .dc.html mockup-u (footer pasus, podnaslov CTA trake), pa je dodato
+     ovde po pravilu "mockup je u pravu" kad se kod i mockup ne poklapaju. */
+  --c-text-on-dark-muted: #cfcbbe;
+
+  /* podloge */
+  --c-bg: #ffffff;
+  --c-bg-cream: #fdfaf0;
+  --c-bg-table: #faf8f1;
+  --c-bg-highlight: #fffbe8;
+
+  /* linije */
+  --c-line: #e7e4da;
+  --c-line-soft: #eeebe2;
+  --c-line-softer: #f0ece0;
+  --c-field: #dcd8cc;
+  --c-field-off: #cfcabd;
+
+  /* pastelni semantički parovi */
+  --c-green-bg: #dcefe3;  --c-green-line: #bfe0cd;  --c-green-ink: #1e5c3c;  --c-green-ink-2: #356b4e;
+  --c-amber-bg: #f7eccc;  --c-amber-ink: #6b5510;
+  --c-orange-bg: #ffe6d4; --c-orange-ink: #8a4418;
+  --c-blue-bg: #d9e8f2;   --c-blue-line: #bcd6e8;   --c-blue-ink: #1c5170;
+  --c-chip-bg: #f4f2ea;
+
+  /* tipografija */
+  --font-sans: "Barlow", system-ui, sans-serif;
+
+  /* radijusi */
+  --r-badge: 4px; --r-dense: 6px; --r-field: 7px; --r-card: 8px;
+
+  /* raster */
+  --gutter-desktop: 40px;
+  --gutter-mobile: 16px;
+  --rail-width: 268px;
+  --grid-gap: 28px;
+  --page-max: 1240px;
+
+  --transition: 140ms cubic-bezier(.4, 0, .2, 1);
+}
