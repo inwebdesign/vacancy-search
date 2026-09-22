@@ -1,0 +1,16 @@
+.ph {
+  position: relative;
+  background-image: repeating-linear-gradient(45deg, #efece2 0 6px, #f8f6ef 6px 12px);
+}
+
+.caption {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  background: rgba(28, 28, 24, 0.75);
+  color: #fff;
+  font: 600 9.5px ui-monospace, Menlo, monospace;
+  letter-spacing: 0.05em;
+  padding: 3px 6px;
+  border-radius: 4px;
+}

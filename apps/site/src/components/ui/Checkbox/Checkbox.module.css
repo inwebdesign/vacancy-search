@@ -1,0 +1,63 @@
+.row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--c-text);
+  cursor: pointer;
+}
+
+/* Vizuelno sakriven, ali i dalje fokusibilan/klikabilan native input —
+   ne display:none (to bi izbacilo tastaturu iz reda). */
+.input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.box {
+  flex-shrink: 0;
+  display: inline-block;
+  border: 1px solid var(--c-field-off);
+  border-radius: 4px;
+  background: #fff;
+  transition: background-color var(--transition), border-color var(--transition);
+}
+
+.sm {
+  width: 16px;
+  height: 16px;
+}
+
+.lg {
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+}
+
+.input:checked + .box {
+  border: 2px solid var(--c-ink);
+  background: var(--c-yellow);
+}
+
+.input:focus-visible + .box {
+  outline: 2px solid var(--c-ink);
+  outline-offset: 2px;
+}
+
+.label {
+  flex: 1;
+}
+
+.trailing {
+  margin-left: auto;
+  color: var(--c-text-muted);
+  font-size: 13px;
+}

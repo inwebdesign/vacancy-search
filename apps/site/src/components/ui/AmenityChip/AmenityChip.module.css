@@ -1,0 +1,12 @@
+.chip {
+  display: inline-flex;
+  align-items: center;
+  background: var(--c-chip-bg);
+  color: var(--c-text);
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 12px;
+  padding: 4px 9px;
+  border-radius: var(--r-badge);
+  white-space: nowrap;
+}

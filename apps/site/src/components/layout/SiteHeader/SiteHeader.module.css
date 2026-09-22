@@ -1,0 +1,118 @@
+.utilityStrip {
+  background: var(--c-yellow);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.09);
+}
+
+.utilityInner {
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: 0 var(--gutter-desktop);
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font: 600 12px var(--font-sans);
+  color: var(--c-ink-on-yellow);
+}
+
+.utilityLinks {
+  display: flex;
+  gap: 18px;
+}
+
+.mainBar {
+  background: var(--c-yellow);
+}
+
+.mainInner {
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: 0 var(--gutter-desktop);
+  height: 66px;
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+
+.wordmark {
+  font: 800 26px/1 var(--font-sans);
+  color: var(--c-ink);
+  letter-spacing: -0.01em;
+}
+
+.wordmark:hover {
+  color: var(--c-ink);
+}
+
+.wordmarkRs {
+  color: #fff;
+}
+
+.nav {
+  display: flex;
+  gap: 22px;
+  font: 600 14px var(--font-sans);
+}
+
+.navItem {
+  color: var(--c-ink);
+  padding-bottom: 2px;
+  border-bottom: 2px solid transparent;
+}
+
+a.navItem:hover {
+  color: var(--c-ink);
+}
+
+.navItemActive {
+  border-bottom-color: var(--c-ink);
+}
+
+.actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.saved {
+  font: 600 13px var(--font-sans);
+  color: var(--c-ink);
+}
+
+/* Mobilni (mock 2b): traka pretrage/nav/akcije se ne uklapaju na 390px —
+   mockup ih krije iza hamburger menija čiji sadržaj nije dizajniran (skill,
+   odeljak 10), pa je dugme za sad dekorativno, bez funkcije. */
+.mobileBar {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .utilityStrip,
+  .nav,
+  .actions {
+    display: none;
+  }
+
+  .mainInner {
+    padding: 0 var(--gutter-mobile);
+    height: 52px;
+  }
+
+  .wordmark {
+    font-size: 22px;
+  }
+
+  .mobileBar {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-left: auto;
+  }
+
+  .mobileBarLine {
+    width: 22px;
+    height: 2px;
+    background: var(--c-ink);
+  }
+}

@@ -1,0 +1,82 @@
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid transparent;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color var(--transition), border-color var(--transition), color var(--transition);
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--c-ink);
+  outline-offset: 2px;
+}
+
+/* varijante */
+
+.primary {
+  background: var(--c-yellow);
+  color: var(--c-ink);
+  border-color: var(--c-yellow);
+}
+
+.primary:hover:not(:disabled) {
+  background: #e6b800;
+  border-color: #e6b800;
+}
+
+.dark {
+  background: var(--c-ink);
+  color: #fff;
+  border-color: var(--c-ink);
+}
+
+.dark:hover:not(:disabled) {
+  background: #3f3f3a;
+  border-color: #3f3f3a;
+}
+
+.outline {
+  background: #fff;
+  color: var(--c-ink);
+  border-color: var(--c-field);
+}
+
+.outline:hover:not(:disabled) {
+  border-color: #c8c2b2;
+}
+
+/* veličine */
+
+.sm {
+  font-weight: 600;
+  font-size: 13px;
+  border-radius: var(--r-dense);
+  padding: 8px 12px;
+}
+
+.md {
+  font-weight: 700;
+  font-size: 14px;
+  border-radius: var(--r-field);
+  padding: 10px 16px;
+}
+
+.lg {
+  font-weight: 700;
+  font-size: 16px;
+  border-radius: var(--r-field);
+  padding: 14px 22px;
+}
+
+.fullWidth {
+  width: 100%;
+}
