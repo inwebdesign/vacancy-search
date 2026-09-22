@@ -65,6 +65,29 @@ export function genitivePhrase(n: number, singular: string, plural: string): str
   return `${n} ${n === 1 ? singular : plural}`;
 }
 
+const NIGHT_FORMS: PluralForms = { one: "noćenje", few: "noćenja", many: "noćenja" };
+
+// from/to su "YYYY-MM-DD".
+export function formatNights(from: string, to: string): string {
+  const nights = Math.round(
+    (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000,
+  );
+  return pluralize(nights, NIGHT_FORMS);
+}
+
+const UNIT_FORMS: PluralForms = { one: "jedinica", few: "jedinice", many: "jedinica" };
+const AGENCY_FORMS: PluralForms = { one: "agencija", few: "agencije", many: "agencija" };
+
+// "Jedinica" broji PONUDE, ne fizičke apartmane (1 ponuda = 1 jedinica za
+// sad — grupisanje po apartmanu nije izgrađeno, vidi OfferRow).
+export function formatUnitCount(n: number): string {
+  return pluralize(n, UNIT_FORMS);
+}
+
+export function formatAgencyCount(n: number): string {
+  return pluralize(n, AGENCY_FORMS);
+}
+
 export function formatTime(date: Date): string {
   return new Intl.DateTimeFormat("sr-RS", {
     hour: "2-digit",

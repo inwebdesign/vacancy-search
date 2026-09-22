@@ -53,3 +53,12 @@ export async function getDestinationStats(limit: number): Promise<DestinationSta
     .sort((a, b) => b.count - a.count)
     .slice(0, limit);
 }
+
+// Sve destinacije koje TRENUTNO imaju bar jednu objavljenu, ne-proslu,
+// ne-rasprodatu ponudu — za predloge u traci za pretragu (<datalist>, bez
+// posebnog autocomplete JS-a). Mali skup (do desetak destinacija u praksi),
+// pa nema potrebe za paginacijom/limitom ovde.
+export async function getDestinationNames(): Promise<string[]> {
+  const stats = await getDestinationStats(1000);
+  return stats.map((s) => s.destinacija).sort((a, b) => a.localeCompare(b, "sr"));
+}

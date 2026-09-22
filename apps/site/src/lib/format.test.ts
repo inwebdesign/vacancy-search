@@ -6,6 +6,9 @@ import {
   joinMeta,
   formatTime,
   genitivePhrase,
+  formatNights,
+  formatUnitCount,
+  formatAgencyCount,
 } from "./format";
 
 describe("formatPrice", () => {
@@ -97,6 +100,33 @@ describe("genitivePhrase", () => {
     expect(genitivePhrase(21, "turističke agencije", "turističkih agencija")).toBe(
       "21 turističkih agencija",
     );
+  });
+});
+
+describe("formatNights", () => {
+  it("mockup primer: 10 noćenja (12.07 -> 22.07)", () => {
+    expect(formatNights("2026-07-12", "2026-07-22")).toBe("10 noćenja");
+  });
+
+  it("1 noćenje jednina, 2-4 i 5+ isti oblik 'noćenja'", () => {
+    expect(formatNights("2026-07-12", "2026-07-13")).toBe("1 noćenje");
+    expect(formatNights("2026-07-12", "2026-07-15")).toBe("3 noćenja");
+    expect(formatNights("2026-07-12", "2026-07-19")).toBe("7 noćenja");
+  });
+
+  it("prelazak preko meseca/godine računa se ispravno", () => {
+    expect(formatNights("2026-12-28", "2027-01-04")).toBe("7 noćenja");
+  });
+});
+
+describe("formatUnitCount / formatAgencyCount", () => {
+  it("isti obrazac množine kao adults (1 / 2-4 / 5+), različite osnove reči", () => {
+    expect(formatUnitCount(1)).toBe("1 jedinica");
+    expect(formatUnitCount(2)).toBe("2 jedinice");
+    expect(formatUnitCount(5)).toBe("5 jedinica");
+    expect(formatAgencyCount(1)).toBe("1 agencija");
+    expect(formatAgencyCount(2)).toBe("2 agencije");
+    expect(formatAgencyCount(5)).toBe("5 agencija");
   });
 });
 
