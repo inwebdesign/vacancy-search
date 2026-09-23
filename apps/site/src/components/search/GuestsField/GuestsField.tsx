@@ -17,14 +17,21 @@ const MAX = 30; // mora da prati MAX_GOSTIJU iz lib/offers/params.ts
 // broj gostiju. Prikazivanje lažne podele bez ičega iza nje bi zbunilo, pa
 // je ovo pojednostavljeno na jedan broj. Popover je native <details> (bez
 // pozicione biblioteke); samo +/- dugmad su klijentska, ne ceo obrazac.
-export function GuestsField({ defaultValue = 2 }: GuestsFieldProps) {
-  const [value, setValue] = useState(defaultValue);
+//
+// Filter kreće nepopunjen (bez podrazumevanog broja), isto kao destinacija
+// i datumi — dok korisnik ne klikne "+", nema aktivnog filtera po broju
+// gostiju. Skriveni input se renderuje samo kad vrednost postoji, pa se
+// brojGostiju ne šalje u query kad je nepopunjen.
+export function GuestsField({ defaultValue }: GuestsFieldProps) {
+  const [value, setValue] = useState<number | null>(defaultValue ?? null);
 
   return (
     <details className={styles.field}>
       <summary className={styles.summary}>
         <span className={styles.label}>Osobe</span>
-        <span className={styles.value}>{pluralize(value, GUEST_FORMS)}</span>
+        <span className={value === null ? styles.placeholder : styles.value}>
+          {value === null ? "Bilo koji broj" : pluralize(value, GUEST_FORMS)}
+        </span>
       </summary>
       <div className={styles.popover}>
         <span className={styles.popoverLabel}>Broj gostiju</span>
@@ -32,25 +39,25 @@ export function GuestsField({ defaultValue = 2 }: GuestsFieldProps) {
           <button
             type="button"
             className={styles.stepperButton}
-            onClick={() => setValue((v) => Math.max(MIN, v - 1))}
-            disabled={value <= MIN}
+            onClick={() => setValue((v) => (v === null || v <= MIN ? null : v - 1))}
+            disabled={value === null}
             aria-label="Smanji broj gostiju"
           >
             −
           </button>
-          <span className={styles.stepperValue}>{value}</span>
+          <span className={styles.stepperValue}>{value ?? "—"}</span>
           <button
             type="button"
             className={styles.stepperButton}
-            onClick={() => setValue((v) => Math.min(MAX, v + 1))}
-            disabled={value >= MAX}
+            onClick={() => setValue((v) => Math.min(MAX, (v ?? MIN - 1) + 1))}
+            disabled={value !== null && value >= MAX}
             aria-label="Povećaj broj gostiju"
           >
             +
           </button>
         </div>
       </div>
-      <input type="hidden" name="brojGostiju" value={value} />
+      {value !== null && <input type="hidden" name="brojGostiju" value={value} />}
     </details>
   );
 }

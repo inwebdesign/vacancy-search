@@ -33,6 +33,11 @@
   color: var(--c-ink);
 }
 
+.placeholder {
+  font: 600 16px var(--font-sans);
+  color: var(--c-text-muted);
+}
+
 .popover {
   position: absolute;
   top: calc(100% + 6px);
