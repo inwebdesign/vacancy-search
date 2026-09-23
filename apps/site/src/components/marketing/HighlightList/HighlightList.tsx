@@ -23,7 +23,7 @@ export function HighlightList({ title, offers }: HighlightListProps) {
     <section>
       <div className={styles.heading}>
         <h2 className={styles.title}>{title}</h2>
-        <SortChips options={SORT_OPTIONS} active="cena" />
+        <SortChips options={SORT_OPTIONS} active="cena" className={styles.sortChips} />
       </div>
       <ul className={styles.list}>
         {offers.map((offer) => (

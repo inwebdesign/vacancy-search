@@ -40,6 +40,10 @@
   justify-content: center;
 }
 
+.priceInfo {
+  min-width: 0;
+}
+
 .priceLabel {
   margin: 0;
   font: 400 12px var(--font-sans);
@@ -85,5 +89,38 @@
   .priceCell {
     border-left: none;
     border-top: 1px solid var(--c-line-soft);
+  }
+}
+
+/* Mock 2b: puna širina, 140px foto, cena i dugme u istom redu (bez
+   razdvojene, gornjom linijom uokvirene cenovne ćelije). */
+@media (max-width: 640px) {
+  .photo {
+    height: 140px;
+  }
+
+  .detail {
+    padding: 12px 14px 0;
+  }
+
+  .priceCell {
+    padding: 0 14px 14px;
+    border-top: none;
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .price {
+    font-size: 26px;
+  }
+
+  .cta {
+    display: inline-flex;
+    align-items: center;
+    width: auto;
+    margin-top: 0;
+    padding: 12px 18px;
   }
 }

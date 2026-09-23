@@ -29,3 +29,27 @@
 .item:last-child {
   border-bottom: none;
 }
+
+/* Mock 2b: nema sort chip-ova na mobilnom (samo naslov sekcije), i kartice su
+   pojedinačno uokvirene sa razmakom umesto jednog kontejnera sa linijama. */
+@media (max-width: 640px) {
+  .sortChips {
+    display: none;
+  }
+
+  .list {
+    border: none;
+    border-radius: 0;
+    overflow: visible;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .item {
+    border-bottom: none;
+    border: 1px solid var(--c-line);
+    border-radius: var(--r-card);
+    overflow: hidden;
+  }
+}

@@ -3,6 +3,12 @@
   padding: 10px 16px;
 }
 
+@media (max-width: 640px) {
+  .field {
+    padding: 9px 14px;
+  }
+}
+
 .summary {
   display: flex;
   flex-direction: column;

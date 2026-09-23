@@ -24,11 +24,13 @@ export function OfferRow({ offer }: OfferRowProps) {
         <p className={styles.meta}>{formatNights(offer.datumPolaska, offer.datumPovratka)}</p>
       </div>
       <div className={styles.priceCell}>
-        <p className={styles.priceLabel}>od</p>
-        <p className={styles.price}>
-          {formatPrice(offer.cenaPoOsobi)}
-          <span className={styles.priceSuffix}> / osobi</span>
-        </p>
+        <div className={styles.priceInfo}>
+          <p className={styles.priceLabel}>od</p>
+          <p className={styles.price}>
+            {formatPrice(offer.cenaPoOsobi)}
+            <span className={styles.priceSuffix}> / osobi</span>
+          </p>
+        </div>
         <Link
           href={`/pretraga?naziv=${encodeURIComponent(offer.naziv)}`}
           className={styles.cta}

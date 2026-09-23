@@ -32,6 +32,10 @@
     align-items: flex-start;
   }
 
+  .title {
+    font-size: 19px;
+  }
+
   .subtitle {
     font: 400 13.5px/1.55 var(--font-sans);
     margin-top: 4px;
@@ -41,5 +45,6 @@
   .ctaButton {
     width: 100%;
     text-align: center;
+    padding: 13px 0;
   }
 }
