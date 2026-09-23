@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { pluralize, type PluralForms } from "@/lib/format";
 import styles from "./GuestsField.module.css";
 
@@ -24,9 +24,23 @@ const MAX = 30; // mora da prati MAX_GOSTIJU iz lib/offers/params.ts
 // brojGostiju ne šalje u query kad je nepopunjen.
 export function GuestsField({ defaultValue }: GuestsFieldProps) {
   const [value, setValue] = useState<number | null>(defaultValue ?? null);
+  const detailsRef = useRef<HTMLDetailsElement>(null);
+
+  // <details> se ne zatvara sam na klik van njega (za razliku od native
+  // <select> ili <dialog>) — bez ovoga popover ostaje otvoren dok korisnik
+  // ne kucne baš na <summary> ponovo.
+  useEffect(() => {
+    function closeIfOutside(event: MouseEvent) {
+      if (detailsRef.current && !detailsRef.current.contains(event.target as Node)) {
+        detailsRef.current.open = false;
+      }
+    }
+    document.addEventListener("mousedown", closeIfOutside);
+    return () => document.removeEventListener("mousedown", closeIfOutside);
+  }, []);
 
   return (
-    <details className={styles.field}>
+    <details ref={detailsRef} className={styles.field}>
       <summary className={styles.summary}>
         <span className={styles.label}>Osobe</span>
         <span className={value === null ? styles.placeholder : styles.value}>
