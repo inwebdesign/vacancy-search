@@ -30,7 +30,7 @@ export function GuestsField({ defaultValue }: GuestsFieldProps) {
       <summary className={styles.summary}>
         <span className={styles.label}>Osobe</span>
         <span className={value === null ? styles.placeholder : styles.value}>
-          {value === null ? "Bilo koji broj" : pluralize(value, GUEST_FORMS)}
+          {value === null ? "Unesite broj gostiju" : pluralize(value, GUEST_FORMS)}
         </span>
       </summary>
       <div className={styles.popover}>
