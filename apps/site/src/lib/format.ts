@@ -24,13 +24,16 @@ function splitIsoDate(iso: string): { y: string; m: string; d: string } {
 
 export type Guests = { adults: number; children?: number };
 
-type PluralForms = { one: string; few: string; many: string };
+export type PluralForms = { one: string; few: string; many: string };
 
 const ADULT_FORMS: PluralForms = { one: "odrasla", few: "odrasle", many: "odraslih" };
 const CHILD_FORMS: PluralForms = { one: "dete", few: "deteta", many: "dece" };
 
-// Srpska množina: 1 (ne 11) → jednina; 2-4 (ne 12-14) → "malo"; ostalo → "puno".
-function pluralCategory(n: number): keyof PluralForms {
+// Srpska množina, nominativni kontekst ("N gostiju stiže", ne "od N gostiju"):
+// 1 (ne 11) → jednina; 2-4 (ne 12-14) → "malo"; ostalo → "puno". Izvezeno da
+// bilo koja komponenta može da definiše sopstvene oblike (npr. "N jedinica",
+// "N noćenja") bez ponavljanja ovog pravila.
+export function pluralCategory(n: number): keyof PluralForms {
   const mod10 = n % 10;
   const mod100 = n % 100;
   if (mod10 === 1 && mod100 !== 11) return "one";
@@ -38,7 +41,7 @@ function pluralCategory(n: number): keyof PluralForms {
   return "many";
 }
 
-function pluralize(n: number, forms: PluralForms): string {
+export function pluralize(n: number, forms: PluralForms): string {
   return `${n} ${forms[pluralCategory(n)]}`;
 }
 
@@ -60,6 +63,29 @@ export function joinMeta(parts: string[]): string {
 // agencija". Ne generalizovati na formatGuests-ov pattern — različito pravilo.
 export function genitivePhrase(n: number, singular: string, plural: string): string {
   return `${n} ${n === 1 ? singular : plural}`;
+}
+
+const NIGHT_FORMS: PluralForms = { one: "noćenje", few: "noćenja", many: "noćenja" };
+
+// from/to su "YYYY-MM-DD".
+export function formatNights(from: string, to: string): string {
+  const nights = Math.round(
+    (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000,
+  );
+  return pluralize(nights, NIGHT_FORMS);
+}
+
+const UNIT_FORMS: PluralForms = { one: "jedinica", few: "jedinice", many: "jedinica" };
+const AGENCY_FORMS: PluralForms = { one: "agencija", few: "agencije", many: "agencija" };
+
+// "Jedinica" broji PONUDE, ne fizičke apartmane (1 ponuda = 1 jedinica za
+// sad — grupisanje po apartmanu nije izgrađeno, vidi OfferRow).
+export function formatUnitCount(n: number): string {
+  return pluralize(n, UNIT_FORMS);
+}
+
+export function formatAgencyCount(n: number): string {
+  return pluralize(n, AGENCY_FORMS);
 }
 
 export function formatTime(date: Date): string {

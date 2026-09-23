@@ -1,0 +1,92 @@
+.field {
+  position: relative;
+  padding: 10px 16px;
+}
+
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  list-style: none;
+  cursor: pointer;
+}
+
+.summary::-webkit-details-marker {
+  display: none;
+}
+
+.summary:focus-visible {
+  outline: 2px solid var(--c-ink);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.label {
+  font: 600 10px var(--font-sans);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--c-text-muted);
+}
+
+.value {
+  font: 600 16px var(--font-sans);
+  color: var(--c-ink);
+}
+
+.placeholder {
+  font: 600 16px var(--font-sans);
+  color: var(--c-text-muted);
+}
+
+.popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 16px;
+  z-index: 10;
+  background: #fff;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-card);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.popoverLabel {
+  font: 600 13px var(--font-sans);
+  color: var(--c-text);
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.stepperButton {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--c-field);
+  border-radius: var(--r-dense);
+  background: #fff;
+  font: 600 16px var(--font-sans);
+  color: var(--c-ink);
+  cursor: pointer;
+}
+
+.stepperButton:hover:not(:disabled) {
+  border-color: #c8c2b2;
+}
+
+.stepperButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.stepperValue {
+  min-width: 24px;
+  text-align: center;
+  font: 700 16px var(--font-sans);
+  color: var(--c-ink);
+}
