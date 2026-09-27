@@ -9,6 +9,8 @@ import {
   formatNights,
   formatUnitCount,
   formatAgencyCount,
+  formatFilterCount,
+  formatGuestCount,
 } from "./format";
 
 describe("formatPrice", () => {
@@ -127,6 +129,22 @@ describe("formatUnitCount / formatAgencyCount", () => {
     expect(formatAgencyCount(1)).toBe("1 agencija");
     expect(formatAgencyCount(2)).toBe("2 agencije");
     expect(formatAgencyCount(5)).toBe("5 agencija");
+  });
+});
+
+describe("formatFilterCount", () => {
+  it("1 filter, 2-4 filtera, 5+ filtera", () => {
+    expect(formatFilterCount(1)).toBe("1 filter");
+    expect(formatFilterCount(3)).toBe("3 filtera");
+    expect(formatFilterCount(5)).toBe("5 filtera");
+  });
+});
+
+describe("formatGuestCount", () => {
+  it("1 gost, 2-4 gosta, 5+ gostiju", () => {
+    expect(formatGuestCount(1)).toBe("1 gost");
+    expect(formatGuestCount(3)).toBe("3 gosta");
+    expect(formatGuestCount(5)).toBe("5 gostiju");
   });
 });
 

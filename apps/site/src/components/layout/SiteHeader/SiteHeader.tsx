@@ -1,14 +1,12 @@
 import Link from "next/link";
-import clsx from "clsx";
 import { Button } from "@/components/ui/Button";
+import { NavLink } from "@/components/layout/NavLink";
 import { formatTime, genitivePhrase } from "@/lib/format";
 import styles from "./SiteHeader.module.css";
 
 export interface SiteHeaderProps {
   agencyCount: number;
   updatedAt: Date;
-  /** Koja stavka navigacije ima donju liniju (npr. "apartmani" na /pretraga). */
-  activeNav?: "apartmani";
   /** Broj sačuvanih pretraga/ponuda — funkcija još nije izgrađena, 0 je iskreno stanje. */
   savedCount?: number;
 }
@@ -16,7 +14,7 @@ export interface SiteHeaderProps {
 // Nav stavke bez sopstvene stranice (Hoteli, Aranžmani sa prevozom, Last
 // minute, Destinacije) su namerno običan tekst, ne <Link> — te rute ne
 // postoje (skill, odeljak 10: nisu dizajnirane), pa ne pravimo mrtve linkove.
-export function SiteHeader({ agencyCount, updatedAt, activeNav, savedCount = 0 }: SiteHeaderProps) {
+export function SiteHeader({ agencyCount, updatedAt, savedCount = 0 }: SiteHeaderProps) {
   return (
     <header>
       <div className={styles.utilityStrip}>
@@ -39,12 +37,13 @@ export function SiteHeader({ agencyCount, updatedAt, activeNav, savedCount = 0 }
           </Link>
 
           <nav className={styles.nav} aria-label="Glavna navigacija">
-            <Link
+            <NavLink
               href="/pretraga"
-              className={clsx(styles.navItem, activeNav === "apartmani" && styles.navItemActive)}
+              className={styles.navItem}
+              activeClassName={styles.navItemActive}
             >
               Apartmani
-            </Link>
+            </NavLink>
             <span className={styles.navItem}>Hoteli</span>
             <span className={styles.navItem}>Aranžmani sa prevozom</span>
             <span className={styles.navItem}>Last minute</span>

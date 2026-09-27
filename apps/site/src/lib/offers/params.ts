@@ -6,6 +6,9 @@ export const PAGE_SIZE = 20;
 const MAX_TEXT_LEN = 100;
 const MAX_GOSTIJU = 30;
 const MAX_PAGE = 500; // sprečava beskorisno duboke offset upite
+const MAX_CENA = 100000; // razumna gornja granica, sprečava besmislene upite
+const MAX_AGENCIJA = 50; // koliko agencija posetilac realno bira odjednom
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export type CenaTip = "po_osobi" | "po_jedinici";
 
@@ -16,6 +19,9 @@ export type SearchParams = {
   datumOd?: string; // YYYY-MM-DD
   datumDo?: string; // YYYY-MM-DD
   brojGostiju?: number;
+  cenaOd?: number; // cena po osobi (€), donja granica
+  cenaDo?: number; // cena po osobi (€), gornja granica
+  agencije?: string[]; // agency id-jevi (filter rail, "AGENCIJA" grupa)
   page: number;
 };
 
@@ -60,6 +66,23 @@ function parseCenaTip(v: string | undefined): CenaTip | undefined {
   return v === "po_osobi" || v === "po_jedinici" ? v : undefined;
 }
 
+// Cena po osobi može imati decimale (cena_po_osobi je izvedena, videti
+// search.ts) — za razliku od parsePositiveInt, ovde 0 je važeća donja granica.
+function parsePrice(v: string | undefined): number | undefined {
+  if (!v || !/^\d+(\.\d{1,2})?$/.test(v)) return undefined;
+  const n = Number(v);
+  return n >= 0 && n <= MAX_CENA ? n : undefined;
+}
+
+function parseAgencije(v: string | undefined): string[] | undefined {
+  if (!v) return undefined;
+  const ids = [...new Set(v.split(",").filter((id) => UUID_RE.test(id)))].slice(
+    0,
+    MAX_AGENCIJA,
+  );
+  return ids.length > 0 ? ids : undefined;
+}
+
 export function parseSearchParams(raw: RawParams): SearchParams {
   const destinacija = cleanText(first(raw.destinacija));
   const naziv = cleanText(first(raw.naziv));
@@ -70,6 +93,12 @@ export function parseSearchParams(raw: RawParams): SearchParams {
     [datumOd, datumDo] = [datumDo, datumOd];
   }
 
+  let cenaOd = parsePrice(first(raw.cenaOd));
+  let cenaDo = parsePrice(first(raw.cenaDo));
+  if (cenaOd !== undefined && cenaDo !== undefined && cenaOd > cenaDo) {
+    [cenaOd, cenaDo] = [cenaDo, cenaOd];
+  }
+
   return {
     destinacija,
     naziv,
@@ -77,6 +106,9 @@ export function parseSearchParams(raw: RawParams): SearchParams {
     datumOd,
     datumDo,
     brojGostiju: parsePositiveInt(first(raw.brojGostiju), MAX_GOSTIJU),
+    cenaOd,
+    cenaDo,
+    agencije: parseAgencije(first(raw.agencija)),
     page: parsePositiveInt(first(raw.page), MAX_PAGE) ?? 1,
   };
 }

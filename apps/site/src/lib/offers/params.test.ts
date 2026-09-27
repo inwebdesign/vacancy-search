@@ -15,6 +15,9 @@ describe("parseSearchParams", () => {
       datumOd: undefined,
       datumDo: undefined,
       brojGostiju: undefined,
+      cenaOd: undefined,
+      cenaDo: undefined,
+      agencije: undefined,
       page: 1,
     });
   });
@@ -95,6 +98,30 @@ describe("parseSearchParams", () => {
 
   it("PAGE_SIZE je 20", () => {
     expect(PAGE_SIZE).toBe(20);
+  });
+
+  it("cenaOd/cenaDo: nenegativan broj, do 2 decimale, gornja granica", () => {
+    expect(parseSearchParams({ cenaOd: "120" }).cenaOd).toBe(120);
+    expect(parseSearchParams({ cenaDo: "420.5" }).cenaDo).toBe(420.5);
+    expect(parseSearchParams({ cenaOd: "0" }).cenaOd).toBe(0);
+    for (const bad of ["-1", "abc", "1.234", "100001", "1e2", ""]) {
+      expect(parseSearchParams({ cenaOd: bad }).cenaOd).toBeUndefined();
+    }
+  });
+
+  it("cenaOd/cenaDo: zamenjen redosled se ispravlja", () => {
+    expect(parseSearchParams({ cenaOd: "300", cenaDo: "100" })).toMatchObject({
+      cenaOd: 100,
+      cenaDo: 300,
+    });
+  });
+
+  it("agencija: lista validnih UUID-ova, razdvojenih zarezom, bez duplikata", () => {
+    const a = "11111111-1111-1111-1111-111111111111";
+    const b = "22222222-2222-2222-2222-222222222222";
+    expect(parseSearchParams({ agencija: `${a},${b},${a}` }).agencije).toEqual([a, b]);
+    expect(parseSearchParams({ agencija: "nije-uuid" }).agencije).toBeUndefined();
+    expect(parseSearchParams({ agencija: "" }).agencije).toBeUndefined();
   });
 });
 

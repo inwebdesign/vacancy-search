@@ -2,11 +2,11 @@
 
 Metasearch za turističke agencije u Srbiji: korisnik pretražuje destinaciju/period/broj gostiju i vidi ponude više agencija jednu pored druge, pa odlazi kod agencije da završi rezervaciju (klik-out, bez plaćanja/rezervacije na platformi). Ponude puni `apps/admin`, sajt ih samo čita.
 
-Plan razvoja: [`docs/PLAN-JAVNI-SAJT.md`](../../docs/PLAN-JAVNI-SAJT.md). **Trenutno stanje: Korak 3 (data sloj)** — pretraga ponuda je gotova i testirana (`searchOffers`), ali nema UI-ja: početna je placeholder, UI čeka dizajn sistem (Korak 4).
+Plan razvoja (data sloj, Koraci 1-3): [`docs/PLAN-JAVNI-SAJT.md`](../../docs/PLAN-JAVNI-SAJT.md). UI se gradi po fazama iz dizajn handoff-a (README + mockup, van repo-a) prateći `.claude/skills/kreiranje_komponenti/SKILL.md`: **Faza 1** temelji (tokeni, font, UI atomi, header/footer), **Faza 2** početna (Hero, pretraga, "Najtraženije", destinacije, CTA traka), **Faza 3** mobilna doterivanja početne, **Faza 4** rezultati pretrage (`/pretraga`: filter rail, kartice, paginacija, klik-tracking) — sve četiri gotove i vizuelno potvrđene.
 
 ## Stack
 
-Next.js 15 (App Router) + TypeScript + Tailwind — isti stack kao `apps/admin`. Sajt zamenjuje raniji Vite/React prototip sa izmišljenim podacima (ostao u git istoriji).
+Next.js 15 (App Router) + TypeScript + **CSS Modules + clsx** (bez Tailwind-a — skill eksplicitno zabranjuje CSS-in-JS/Tailwind, "svaka stilizovana komponenta postaje klijentska"). Isti Next.js/TypeScript stack kao `apps/admin`, ali `apps/admin` zadržava sopstveni Tailwind — dve nezavisne instalacije. Sajt zamenjuje raniji Vite/React prototip sa izmišljenim podacima (ostao u git istoriji).
 
 ## Pravilo: browser nikad ne dodiruje bazu
 
@@ -22,7 +22,7 @@ cp apps/site/.env.example apps/site/.env.local   # popuni Supabase vrednosti (is
 npm run dev:site                  # http://localhost:3001
 ```
 
-Port je 3001 da ne kolidira sa adminom (3000). `SUPABASE_SERVICE_ROLE_KEY` treba tek od Koraka 5 (klik-tracking) — do tada ostaje prazan.
+Port je 3001 da ne kolidira sa adminom (3000). `SUPABASE_SERVICE_ROLE_KEY` je od Faze 4 obavezan — koristi ga `/go/[offerId]` (klik-tracking) za upis u `clicks` i čitanje `kontakt_url` (anon nema pristup toj koloni).
 
 ## Build
 
@@ -33,11 +33,21 @@ npm run build:site
 ## Struktura
 
 ```
-src/app/                   Next.js App Router (layout, početna)
-src/lib/supabase/public.ts Server-only Supabase klijent (anon ključ, bez sesije)
-src/lib/offers/params.ts   Čist kod: parsiranje/validacija URL parametara pretrage, escapeLike, današnji datum u Srbiji
-src/lib/offers/search.ts   Server-only: searchOffers() — pretraga objavljenih ponuda (filteri: destinacija, naziv apartmana, tip cene, datumi, gosti; najjeftinije prvo po ceni po osobi, 20 po strani)
-src/lib/debounce.ts        debounce za unos pretrage (300ms), koristi ga UI u Koraku 4
+src/app/                       layout (header/footer, font), početna ("/"), rezultati ("/pretraga"), klik-tracking ("/go/[offerId]")
+src/components/ui/             Deljeni atomi: Button, Badge, Checkbox, AmenityChip, PhotoPlaceholder, SortChips
+src/components/layout/         SiteHeader, SiteFooter, NavLink (klijentski list za aktivnu nav stavku)
+src/components/marketing/      Hero, HighlightList, OfferRow, DestinationGrid, AgencyCtaBand — početna
+src/components/search/         SearchBar, DestinationInput, DateRangeField, GuestsField — deljena traka pretrage
+src/components/filters/        PriceRangeFilter, AgencyFilter, FilterRail — filter rail na "/pretraga"
+src/components/results/        ResultCard, Pagination, ActiveFilterStrip, ResultsHeader — rezultati pretrage
+src/lib/supabase/public.ts     Server-only Supabase klijent (anon ključ, bez sesije)
+src/lib/supabase/admin.ts      Server-only Supabase klijent (service_role) — samo za /go/[offerId]
+src/lib/offers/params.ts       Čist kod: parsiranje/validacija URL parametara pretrage (uključujući cenaOd/Do, agencija), escapeLike, današnji datum u Srbiji
+src/lib/offers/search.ts       Server-only: searchOffers, getAgencyFacets, countOffers, getMinPrice
+src/lib/offers/home.ts         Server-only: podaci za početnu (top ponude, statistika po destinaciji)
+src/lib/offers/query.ts        Čista funkcija: gradi sledeći URL za /pretraga iz trenutnog query-ja + izmena (koriste je filter komponente)
+src/lib/format.ts              Sve formatiranje cena/datuma/množine na jednom mestu (nema ručnog spajanja stringova po komponentama)
+src/lib/debounce.ts            debounce za unos pretrage (300ms)
 ```
 
 ## Testovi

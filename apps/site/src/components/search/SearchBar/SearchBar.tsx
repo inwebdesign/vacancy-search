@@ -5,24 +5,36 @@ import styles from "./SearchBar.module.css";
 
 export interface SearchBarProps {
   destinations: string[];
+  /** Trenutne vrednosti pretrage — koristi /pretraga da traka prikaže tekuću
+   * pretragu ("Izmeni" iz mock-a: kod nas je traka uvek editabilna, pa
+   * posebno dugme nije potrebno — ovo popunjavanje ga zamenjuje). */
+  defaultDestinacija?: string;
+  defaultDatumOd?: string;
+  defaultDatumDo?: string;
+  defaultBrojGostiju?: number;
 }
 
 // Obična GET forma — nema router.push/JS na submit-u. Browser sam sastavi
 // query string iz name atributa polja i navigira na /pretraga (skill:
 // "Stanje u URL-u", pretraga je deljiv/back-forward-friendly link, ne
-// klijentska navigacija). /pretraga stiže u Fazi 4 — do tada dugme vodi
-// na rutu koja još ne postoji (očekivano, ne bag).
-export function SearchBar({ destinations }: SearchBarProps) {
+// klijentska navigacija).
+export function SearchBar({
+  destinations,
+  defaultDestinacija,
+  defaultDatumOd,
+  defaultDatumDo,
+  defaultBrojGostiju,
+}: SearchBarProps) {
   return (
     <form method="get" action="/pretraga" className={styles.bar}>
       <div className={styles.cell}>
-        <DestinationInput destinations={destinations} />
+        <DestinationInput destinations={destinations} defaultValue={defaultDestinacija} />
       </div>
       <div className={styles.cell}>
-        <DateRangeField />
+        <DateRangeField defaultFrom={defaultDatumOd} defaultTo={defaultDatumDo} />
       </div>
       <div className={styles.cell}>
-        <GuestsField />
+        <GuestsField defaultValue={defaultBrojGostiju} />
       </div>
       <button type="submit" className={styles.submit}>
         Pretraži

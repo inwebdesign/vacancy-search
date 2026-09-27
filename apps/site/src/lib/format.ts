@@ -88,6 +88,21 @@ export function formatAgencyCount(n: number): string {
   return pluralize(n, AGENCY_FORMS);
 }
 
+const FILTER_FORMS: PluralForms = { one: "filter", few: "filtera", many: "filtera" };
+
+export function formatFilterCount(n: number): string {
+  return pluralize(n, FILTER_FORMS);
+}
+
+const GUEST_FORMS: PluralForms = { one: "gost", few: "gosta", many: "gostiju" };
+
+// "N gostiju" bez razdvajanja na odrasle/decu — vidi GuestsField, filter za
+// broj gostiju je namerno pojednostavljen na jedan broj (nema tog podatka
+// razdvojenog u šemi).
+export function formatGuestCount(n: number): string {
+  return pluralize(n, GUEST_FORMS);
+}
+
 export function formatTime(date: Date): string {
   return new Intl.DateTimeFormat("sr-RS", {
     hour: "2-digit",

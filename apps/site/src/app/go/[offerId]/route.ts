@@ -2,15 +2,10 @@ import { NextResponse } from "next/server";
 import { createHash } from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-// Faza 2, Korak 6: javna (bez auth) click-out ruta — brief sekcija 9,
-// "clicks tabela beleži svaki klik na 'Poseti agenciju' dugme". Poziva se sa
-// javnog sajta (apps/site), ali NIJE ožičena tamo — apps/site trenutno čita
-// mock podatke, ne pravu offers tabelu (van scope-a brief-a, sekcija 1:
-// "Javni search sajt... nije predmet ovog brief-a"). Testira se direktno
-// preko URL-a dok se ta integracija ne uradi.
-//
-// service_role je neophodan — poziva ga anoniman posetilac sajta bez
-// ulogovane sesije, nema RLS-scoped klijenta za njega.
+// Javna (bez auth) click-out ruta — Faza 2 Korak 6 (apps/admin) je ovo
+// izgradila i testirala direktno preko URL-a, ali na admin domenu; Faza 4
+// je premešta ovde jer je javni sajt (slobodno.rs) tamo gde posetilac
+// stvarno klika "Idi na sajt", ne interni admin panel. Ista logika.
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ offerId: string }> },
@@ -32,9 +27,6 @@ export async function GET(
   const ipHash = createHash("sha256").update(ip).digest("hex");
   const userAgent = request.headers.get("user-agent");
 
-  // Gruba heuristika za bot-ove i duple klikove — namerno jednostavno za
-  // prvi prolaz (regex na user-agent + 30-min prozor po istom ip_hash-u za
-  // istu ponudu), otvoreno za doradu.
   const isBot = /bot|crawler|spider|curl|wget|headless/i.test(userAgent ?? "");
 
   const { data: recentClick } = await admin

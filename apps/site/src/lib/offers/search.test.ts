@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { searchOffers, type PublicOffer } from "./search";
+import { searchOffers, getAgencyFacets, countOffers, getMinPrice, type PublicOffer } from "./search";
 import { PAGE_SIZE, type SearchParams } from "./params";
 import { createPublicClient } from "@/lib/supabase/public";
 
@@ -233,6 +233,95 @@ describe("prošli polasci i rasprodato", () => {
 
   it("rasprodate (dostupno_mesta = 0) nikad ne stižu do posetioca", () => {
     for (const o of ALL) expect(o.dostupnoMesta).not.toBe(0);
+  });
+});
+
+describe("cena po osobi (opseg)", () => {
+  it("cenaOd/cenaDo filtriraju po IZVEDENOJ ceni po osobi, isto kao JS filter", async () => {
+    const sorted = [...ALL].sort((a, b) => a.cenaPoOsobi - b.cenaPoOsobi);
+    const od = sorted[Math.floor(sorted.length * 0.25)].cenaPoOsobi;
+    const doo = sorted[Math.floor(sorted.length * 0.75)].cenaPoOsobi;
+    const expected = ALL.filter((o) => o.cenaPoOsobi >= od && o.cenaPoOsobi <= doo);
+    const { total } = await fetchAll({ cenaOd: od, cenaDo: doo });
+    expect(total).toBe(expected.length);
+  });
+
+  it("samo cenaOd ili samo cenaDo", async () => {
+    const mid = [...ALL].sort((a, b) => a.cenaPoOsobi - b.cenaPoOsobi)[
+      Math.floor(ALL.length / 2)
+    ].cenaPoOsobi;
+    const expectedOd = ALL.filter((o) => o.cenaPoOsobi >= mid).length;
+    const expectedDo = ALL.filter((o) => o.cenaPoOsobi <= mid).length;
+    expect((await searchOffers(P({ cenaOd: mid }), { today: ALL_TIME })).total).toBe(expectedOd);
+    expect((await searchOffers(P({ cenaDo: mid }), { today: ALL_TIME })).total).toBe(expectedDo);
+  });
+
+  it("opseg van postojećih cena → 0 rezultata", async () => {
+    expect((await searchOffers(P({ cenaOd: 999999 }), { today: ALL_TIME })).total).toBe(0);
+  });
+});
+
+describe("agencija (facet i filter)", () => {
+  it("getAgencyFacets: zbir brojeva = ukupan broj ponuda, opadajući redosled", async () => {
+    const facets = await getAgencyFacets({}, { today: ALL_TIME });
+    expect(facets.reduce((s, f) => s + f.count, 0)).toBe(ALL.length);
+    for (let i = 1; i < facets.length; i++) {
+      expect(facets[i - 1].count >= facets[i].count).toBe(true);
+    }
+  });
+
+  it("getAgencyFacets poštuje ostale filtere (destinacija)", async () => {
+    const q = ALL[0].destinacija.slice(0, 3);
+    const expected = ALL.filter((o) => o.destinacija.toLowerCase().includes(q.toLowerCase())).length;
+    const facets = await getAgencyFacets({ destinacija: q }, { today: ALL_TIME });
+    expect(facets.reduce((s, f) => s + f.count, 0)).toBe(expected);
+  });
+
+  it("filter po agency id vraća tačno ponude te agencije, isto kao JS filter po imenu", async () => {
+    const facets = await getAgencyFacets({}, { today: ALL_TIME });
+    const target = facets[0];
+    const expected = ALL.filter((o) => o.agencija === target.naziv);
+    const { total } = await fetchAll({ agencije: [target.id] });
+    expect(total).toBe(expected.length);
+  });
+
+  it("nepostojeći agency id → 0 rezultata", async () => {
+    const r = await searchOffers(P({ agencije: ["00000000-0000-0000-0000-000000000000"] }), {
+      today: ALL_TIME,
+    });
+    expect(r.total).toBe(0);
+  });
+});
+
+describe("countOffers (osnova bez filter rail-a)", () => {
+  it("bez ičega = ukupan broj", async () => {
+    expect(await countOffers({}, { today: ALL_TIME })).toBe(ALL.length);
+  });
+
+  it("poštuje destinaciju, ali ignoriše cenu/agenciju (nije im namenjen)", async () => {
+    const q = ALL[0].destinacija.slice(0, 3);
+    const expected = ALL.filter((o) => o.destinacija.toLowerCase().includes(q.toLowerCase())).length;
+    expect(await countOffers({ destinacija: q }, { today: ALL_TIME })).toBe(expected);
+  });
+});
+
+describe("getMinPrice", () => {
+  it("tačna minimalna cena za trenutni filtrirani skup, nezavisno od strane", async () => {
+    const sorted = [...ALL].sort((a, b) => a.cenaPoOsobi - b.cenaPoOsobi);
+    expect(await getMinPrice({}, { today: ALL_TIME })).toBe(sorted[0].cenaPoOsobi);
+  });
+
+  it("poštuje cenaOd/cenaDo", async () => {
+    const sorted = [...ALL].sort((a, b) => a.cenaPoOsobi - b.cenaPoOsobi);
+    const cenaOd = sorted[Math.floor(sorted.length / 2)].cenaPoOsobi;
+    const expected = ALL.filter((o) => o.cenaPoOsobi >= cenaOd).sort(
+      (a, b) => a.cenaPoOsobi - b.cenaPoOsobi,
+    )[0].cenaPoOsobi;
+    expect(await getMinPrice({ cenaOd }, { today: ALL_TIME })).toBe(expected);
+  });
+
+  it("prazan skup → null", async () => {
+    expect(await getMinPrice({ cenaOd: 999999 }, { today: ALL_TIME })).toBeNull();
   });
 });
 

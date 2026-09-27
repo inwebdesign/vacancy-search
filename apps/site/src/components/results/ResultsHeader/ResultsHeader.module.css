@@ -1,0 +1,11 @@
+.title {
+  margin: 0;
+  font: 800 26px/1.2 var(--font-sans);
+  color: var(--c-ink);
+}
+
+.subtitle {
+  margin: 3px 0 0;
+  font: 400 14px var(--font-sans);
+  color: var(--c-text-muted);
+}
