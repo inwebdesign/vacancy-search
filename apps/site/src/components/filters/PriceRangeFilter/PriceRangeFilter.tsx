@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { buildSearchUrl } from "@/lib/offers/query";
 import styles from "./PriceRangeFilter.module.css";
@@ -28,6 +28,15 @@ export function PriceRangeFilter({
   const searchParams = useSearchParams();
   const [od, setOd] = useState(defaultOd?.toString() ?? "");
   const [doo, setDoo] = useState(defaultDo?.toString() ?? "");
+
+  // Komponenta ne remontira se između navigacija na istoj ruti (samo se query
+  // menja), pa lokalni unos ne bi sam pratio spolja primenjen filter — npr.
+  // "Poništi sve" menja URL, ali bi polja ostala da pokazuju stari unos bez
+  // ovoga.
+  useEffect(() => {
+    setOd(defaultOd?.toString() ?? "");
+    setDoo(defaultDo?.toString() ?? "");
+  }, [defaultOd, defaultDo]);
 
   function apply(e: React.FormEvent) {
     e.preventDefault();

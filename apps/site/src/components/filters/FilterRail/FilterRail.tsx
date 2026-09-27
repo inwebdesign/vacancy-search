@@ -36,9 +36,11 @@ export function FilterRail({
     <aside>
       <div className={styles.header}>
         <p className={styles.title}>Filter</p>
-        <Link href={resetHref} className={styles.reset}>
-          Poništi sve
-        </Link>
+        {activeFilterCount > 0 && (
+          <Link href={resetHref} className={styles.reset}>
+            Poništi sve
+          </Link>
+        )}
       </div>
       <div className={styles.groups}>
         <PriceRangeFilter
