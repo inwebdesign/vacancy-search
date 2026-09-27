@@ -32,3 +32,9 @@
   outline-offset: 2px;
   border-radius: 2px;
 }
+
+@media (max-width: 640px) {
+  .field {
+    padding: 9px 14px;
+  }
+}

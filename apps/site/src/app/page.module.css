@@ -30,3 +30,11 @@
     display: none;
   }
 }
+
+/* Mock 2b: sekcije su mnogo bliže jedna drugoj na mobilnom nego desktop
+   razmak od 30px (Destinacije ima svega 8px padding-top iznad grida). */
+@media (max-width: 640px) {
+  .content {
+    gap: 20px;
+  }
+}
