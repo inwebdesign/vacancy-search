@@ -1,0 +1,65 @@
+.group {
+  padding: 14px 14px 16px;
+  border-bottom: 1px solid var(--c-line-soft);
+}
+
+.label {
+  margin: 0 0 10px;
+  font: 600 10px var(--font-sans);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--c-text-muted);
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.fieldLabel {
+  font: 400 11px var(--font-sans);
+  color: var(--c-text-muted);
+}
+
+.input {
+  border: 1px solid var(--c-field);
+  border-radius: var(--r-dense);
+  padding: 8px 9px;
+  font: 600 14px var(--font-sans);
+  color: var(--c-ink);
+  background: #fff;
+  width: 100%;
+  min-width: 0;
+}
+
+.input::placeholder {
+  color: var(--c-text-disabled);
+  font-weight: 400;
+}
+
+.input:focus-visible {
+  outline: none;
+  border-color: var(--c-ink);
+}
+
+.ok {
+  border: 1px solid var(--c-ink);
+  border-radius: var(--r-dense);
+  background: #fff;
+  padding: 8px 11px;
+  font: 600 13px var(--font-sans);
+  color: var(--c-ink);
+  cursor: pointer;
+}
+
+.ok:hover {
+  background: var(--c-bg-cream);
+}

@@ -18,6 +18,15 @@ body {
   font: 400 14px/1.6 var(--font-sans);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  /* Footer ostaje na dnu ekrana i kad je sadržaj kraći od visine prozora
+     (npr. prazni rezultati pretrage) — <main> raste da popuni ostatak. */
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+main {
+  flex: 1;
 }
 
 a {

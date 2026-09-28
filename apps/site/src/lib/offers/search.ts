@@ -91,6 +91,9 @@ export async function searchOffers(
   if (params.datumOd) query = query.gte("datum_povratka", params.datumOd);
   if (params.datumDo) query = query.lte("datum_polaska", params.datumDo);
   if (params.brojGostiju) query = query.gte("max_gostiju", params.brojGostiju);
+  if (params.cenaOd !== undefined) query = query.gte("cena_po_osobi", params.cenaOd);
+  if (params.cenaDo !== undefined) query = query.lte("cena_po_osobi", params.cenaDo);
+  if (params.agencije) query = query.in("agency_id", params.agencije);
 
   const { data, count, error } = await query;
   if (error?.code === "PGRST103" && params.page > 1) {
@@ -131,4 +134,136 @@ export async function searchOffers(
     pageSize: PAGE_SIZE,
     totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)),
   };
+}
+
+export type AgencyFacet = { id: string; naziv: string; count: number };
+
+type AgencyFacetRow = { agency_id: string; agencies: { naziv: string } | null };
+
+// Broj ponuda po agenciji za TRENUTNU pretragu — ali bez agencija filtera
+// samog (skill, filter rail: "svaka opcija pokazuje broj rezultata... bez
+// grupe koja se broji"), da izbor jedne agencije ne obriše ostale sa liste.
+// Nema GROUP BY u PostgREST-u, pa se (kao i getDestinationStats) povuku svi
+// poklapajući redovi i broje se u JS-u — prihvatljivo dok je skup mali
+// (vidi tech debt "Trigram indeks za pretragu").
+export async function getAgencyFacets(
+  params: Omit<SearchParams, "agencije" | "page">,
+  opts: { today?: string } = {},
+): Promise<AgencyFacet[]> {
+  const today = opts.today ?? todayInBelgrade();
+
+  let query = createPublicClient()
+    .from("offers")
+    .select("agency_id, agencies(naziv)")
+    .eq("status", "published")
+    .gte("datum_polaska", today)
+    .or("dostupno_mesta.is.null,dostupno_mesta.gt.0");
+
+  if (params.destinacija) {
+    query = query.ilike("destinacija", `%${escapeLike(params.destinacija)}%`);
+  }
+  if (params.naziv) {
+    query = query.ilike("naziv", `%${escapeLike(params.naziv)}%`);
+  }
+  if (params.cenaTip) query = query.eq("cena_tip", params.cenaTip);
+  if (params.datumOd) query = query.gte("datum_povratka", params.datumOd);
+  if (params.datumDo) query = query.lte("datum_polaska", params.datumDo);
+  if (params.brojGostiju) query = query.gte("max_gostiju", params.brojGostiju);
+  if (params.cenaOd !== undefined) query = query.gte("cena_po_osobi", params.cenaOd);
+  if (params.cenaDo !== undefined) query = query.lte("cena_po_osobi", params.cenaDo);
+
+  const { data, error } = await query;
+  if (error) {
+    throw new Error(`Facet po agenciji nije uspeo: ${error.message}`);
+  }
+
+  const byAgency = new Map<string, { naziv: string; count: number }>();
+  for (const row of (data ?? []) as unknown as AgencyFacetRow[]) {
+    if (!row.agencies) continue;
+    const existing = byAgency.get(row.agency_id);
+    if (existing) existing.count += 1;
+    else byAgency.set(row.agency_id, { naziv: row.agencies.naziv, count: 1 });
+  }
+  return [...byAgency.entries()]
+    .map(([id, v]) => ({ id, naziv: v.naziv, count: v.count }))
+    .sort((a, b) => b.count - a.count || a.naziv.localeCompare(b.naziv, "sr"));
+}
+
+type SearchOnlyParams = Pick<
+  SearchParams,
+  "destinacija" | "naziv" | "cenaTip" | "datumOd" | "datumDo" | "brojGostiju"
+>;
+
+// Broj ponuda koje odgovaraju SAMO traci pretrage (destinacija/termin/gosti),
+// bez filter rail-a (cena, agencija) — osnova za "Prikazano X od Y jedinica"
+// u zelenoj kutiji (skill, Filter odeljak). head:true, bez povlačenja redova.
+export async function countOffers(
+  params: SearchOnlyParams,
+  opts: { today?: string } = {},
+): Promise<number> {
+  const today = opts.today ?? todayInBelgrade();
+
+  let query = createPublicClient()
+    .from("offers")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "published")
+    .gte("datum_polaska", today)
+    .or("dostupno_mesta.is.null,dostupno_mesta.gt.0");
+
+  if (params.destinacija) {
+    query = query.ilike("destinacija", `%${escapeLike(params.destinacija)}%`);
+  }
+  if (params.naziv) {
+    query = query.ilike("naziv", `%${escapeLike(params.naziv)}%`);
+  }
+  if (params.cenaTip) query = query.eq("cena_tip", params.cenaTip);
+  if (params.datumOd) query = query.gte("datum_povratka", params.datumOd);
+  if (params.datumDo) query = query.lte("datum_polaska", params.datumDo);
+  if (params.brojGostiju) query = query.gte("max_gostiju", params.brojGostiju);
+
+  const { count, error } = await query;
+  if (error) {
+    throw new Error(`Brojanje ponuda nije uspelo: ${error.message}`);
+  }
+  return count ?? 0;
+}
+
+// Najniža cena po osobi u TRENUTNOM filtriranom skupu (za zelenu kutiju:
+// "Najniža cena u izboru je X €"). Rezultati u searchOffers su već sortirani
+// rastuće po ceni, ali offers[0] je tačan samo na prvoj strani — ovo radi
+// nezavisno od stranice, jednim jeftinim upitom (limit 1).
+export async function getMinPrice(
+  params: Omit<SearchParams, "page">,
+  opts: { today?: string } = {},
+): Promise<number | null> {
+  const today = opts.today ?? todayInBelgrade();
+
+  let query = createPublicClient()
+    .from("offers")
+    .select("cena_po_osobi")
+    .eq("status", "published")
+    .gte("datum_polaska", today)
+    .or("dostupno_mesta.is.null,dostupno_mesta.gt.0")
+    .order("cena_po_osobi", { ascending: true })
+    .limit(1);
+
+  if (params.destinacija) {
+    query = query.ilike("destinacija", `%${escapeLike(params.destinacija)}%`);
+  }
+  if (params.naziv) {
+    query = query.ilike("naziv", `%${escapeLike(params.naziv)}%`);
+  }
+  if (params.cenaTip) query = query.eq("cena_tip", params.cenaTip);
+  if (params.datumOd) query = query.gte("datum_povratka", params.datumOd);
+  if (params.datumDo) query = query.lte("datum_polaska", params.datumDo);
+  if (params.brojGostiju) query = query.gte("max_gostiju", params.brojGostiju);
+  if (params.cenaOd !== undefined) query = query.gte("cena_po_osobi", params.cenaOd);
+  if (params.cenaDo !== undefined) query = query.lte("cena_po_osobi", params.cenaDo);
+  if (params.agencije) query = query.in("agency_id", params.agencije);
+
+  const { data, error } = await query;
+  if (error) {
+    throw new Error(`Najniža cena nije mogla da se izračuna: ${error.message}`);
+  }
+  return (data as unknown as Array<{ cena_po_osobi: number }>)[0]?.cena_po_osobi ?? null;
 }

@@ -246,6 +246,9 @@ Stavke koje su namerno odložene tokom razgovora o Koraku 7 — ne blokiraju tre
 - **Definicija "preklapanja" datuma** (javni sajt, Korak 3) — implementirano je opšte preklapanje (ponuda se prikazuje ako se bilo koji njen dan poklapa sa traženim periodom). Za fiksne turnuse (npr. 10 noćenja) to je verovatno dobro, ali za apartmane sa fleksibilnim terminom možda treba "period ponude pokriva ceo traženi boravak". Proveriti na stvarnim korisnicima; promena je jedan uslov u `searchOffers`.
 - **Uzrast dece kao podfilter** (javni sajt, `GuestsField`) — filter za goste je za sad samo jedan ukupan broj (vidi tech debt napomenu o "2 odrasle · 1 dete" iznad); ne postoji podela na odrasle/decu niti uzrast deteta. Verovatno će zatrebati kad se pojavi poslovno pravilo vezano za uzrast (npr. deca mlađa od 2 godine ne plaćaju smeštaj) — to nosi i UI podfilter (uzrast po detetu) i, verovatno, izmenu šeme (`offers` trenutno nema kolonu za cenu/kapacitet po uzrasnoj grupi, samo `max_gostiju`). Nije dizajnirano, otvoreno za kad se poslovno pravilo definiše.
 - **Stilizacija dropdown-a za destinaciju** (javni sajt, `DestinationInput`, Faza 3) — polje koristi native `<input list>` + `<datalist>` (namerno, po pravilu skill-a "native umesto custom widget-a"), pa padajući spisak predloga iscrtava sam pretraživač i ne može se stilizovati preko CSS-a (izgled, font, razmak — sve van naše kontrole). Vizuelnim testom (2026-09-27) primećeno da taj izgled ne uklapa sa ostatkom sajta. Rešenje bi bio sopstveni combobox (stilizovan input + lista, tastaturna navigacija, ARIA `combobox` obrazac) — odloženo, veći komad posla i odstupanje od "native prvo" pravila; odlučiti kad se prioritizuje.
+- **Filter grupe bez strukturiranih podataka** (javni sajt, `/pretraga`, Faza 4, odluka 2026-09-27) — mock rezultata pretrage ima grupe "tip jedinice", "udaljenost od plaže", "usluga" (obrok), "sadržaj" (klima/wifi/bazen...) i "prevoz". Nijedna od njih nema svoju kolonu u `offers` — tip jedinice i prevoz postoje samo kao slobodan tekst unutar `naziv` (npr. "Studio 2/1", "autobuski prevoz"), ostale uopšte ne postoje u šemi. Filter rail za sad gradi SAMO grupe sa pravim kolonama (cena po osobi, agencija); ostatak čeka da se ti podaci stvarno unesu (nova kolona/kolone + ekstrakcija iz PDF-a/CSV-a). Namerno nisu izmišljeni niti izvedeni heuristikom iz `naziv` teksta (rizik od pogrešnog filtriranja).
+- **"Ukupna cena za N osoba" filter** (javni sajt, `/pretraga`, Faza 4) — mock ima ovaj filter pored "cena po osobi", ali PostgREST/`supabase-js` ne filtrira po izračunatoj vrednosti (`cena_po_osobi × broj gostiju`) bez generisane kolone ili RPC funkcije — to je poseban infra korak, ne samo nedostatak podataka. Odloženo dok se ne odluči pristup (generisana kolona vezana za pretragu je nezgodna jer "broj gostiju" varira po upitu, RPC je čistije rešenje).
+- **Cenovni opseg na `/pretraga` traži OK klik** (javni sajt, `PriceRangeFilter`, Faza 4, primedba 2026-09-27) — trenutno ponašanje je namerno, po skill pravilu ("desktop range grupe završavaju kompaktnim OK dugmetom koje primenjuje uneti opseg"), pa unos "od"/"do" ne filtrira rezultate dok se ne potvrdi. Razmotriti da li opseg treba da se primenjuje odmah (on-the-fly, npr. na blur ili debounce, bez OK dugmeta) — nije odlučeno, ostaje kako skill nalaže dok se ne kaže drugačije.
 
 ## Faza 2 — Unos i obrada ponuda
 
@@ -301,7 +304,7 @@ Testirano na tekstu realnog PDF-a partner agencije (Aqua Travel, last-minute cen
 
 Javna (bez auth) ruta `/go/[offerId]` — brief sekcija 9: "clicks tabela beleži svaki klik". Zapisuje preko `service_role` (anoniman posetilac nema sesiju), 302 redirect na `offer.kontakt_url`. `is_valid = false` za user-agent koji liči na bot/skriptu (regex) ILI ponovljen klik sa iste IP adrese na istu ponudu u poslednjih 30 min.
 
-**Nije ožičeno na `apps/site`** — taj sajt čita mock podatke, ne pravu `offers` tabelu; brief eksplicitno isključuje javni sajt iz scope-a (sekcija 1). Testirano direktno preko URL-a.
+**Premešteno na `apps/site` u Fazi 4** — ruta je prvobitno izgrađena i testirana ovde (dok javni sajt nije ni postojao), ali posetilac slobodno.rs klika "Idi na sajt" na TOM domenu, ne na internom admin panelu, pa je stvarna implementacija sada u `apps/site/src/app/go/[offerId]/route.ts` (identična logika, sopstveni `service_role` klijent). Ovaj fajl je uklonjen iz `apps/admin` da ne postoje dve kopije iste rute.
 
 ### Dodatna unapređenja (posle testiranja na realnim podacima, van originalnog plana)
 
@@ -340,7 +343,7 @@ Vitest, samo čisti unit testovi (bez baze): `cena-tip`, normalizacija AI odgovo
 - [x] Korak 3: CSV/Excel parsing + pun snapshot rekonsilijacija
 - [x] Korak 4: PDF/LLM ekstrakcija (Claude API) — testirano na realnom PDF-u partner agencije
 - [x] Korak 5: review queue
-- [x] Korak 6: click tracking (click-out endpoint, nije ožičeno na `apps/site`)
+- [x] Korak 6: click tracking (click-out endpoint, premešten na `apps/site` u Fazi 4)
 
 ## Javni sajt — uvezivanje `apps/site` sa bazom (van Faze 2, u toku)
 

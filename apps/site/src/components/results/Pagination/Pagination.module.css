@@ -1,0 +1,38 @@
+.wrap {
+  margin-top: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.pages {
+  display: flex;
+  gap: 6px;
+  font: 600 14px var(--font-sans);
+}
+
+.page {
+  padding: 9px 14px;
+  border: 1px solid var(--c-field);
+  border-radius: var(--r-field);
+  color: var(--c-text);
+}
+
+.page:hover {
+  border-color: var(--c-field-off);
+  color: var(--c-ink);
+}
+
+.pageActive {
+  border: 2px solid var(--c-ink);
+  background: var(--c-yellow);
+  color: var(--c-ink);
+}
+
+.summary {
+  margin: 0;
+  font: 400 13px var(--font-sans);
+  color: var(--c-text-muted);
+}
