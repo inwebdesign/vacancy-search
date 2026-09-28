@@ -1,0 +1,133 @@
+/* Mobilni podrazumevani prikaz: rail je sakriven iza dugmeta, ne zauzima
+   prostor "above the fold" (skill/korisnička primedba 2026-09-28). */
+
+.trigger {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--c-ink);
+  color: #fff;
+  border: none;
+  border-radius: var(--r-field);
+  padding: 13px 0;
+  font: 700 15px var(--font-sans);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+
+.pill {
+  background: var(--c-yellow);
+  color: var(--c-ink);
+  border-radius: 999px;
+  min-width: 20px;
+  padding: 1px 6px;
+  font: 700 12px var(--font-sans);
+}
+
+.overlay {
+  display: none;
+}
+
+.overlay[data-open] {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+}
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  border: none;
+  background: rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+}
+
+.sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 16px 16px 0 0;
+}
+
+.handle {
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--c-field);
+  margin: 10px auto;
+  flex-shrink: 0;
+}
+
+.sheetBody {
+  overflow-y: auto;
+  padding: 0 16px 16px;
+}
+
+.sheetFooter {
+  flex-shrink: 0;
+  padding: 14px 16px;
+  border-top: 1px solid var(--c-line);
+}
+
+.apply {
+  width: 100%;
+  background: var(--c-ink);
+  color: #fff;
+  border: none;
+  border-radius: var(--r-field);
+  padding: 14px 0;
+  font: 700 15px var(--font-sans);
+  cursor: pointer;
+}
+
+/* Desktop/tablet: isti sadržaj kao obična inline traka, bez sheet-chrome-a
+   ili "open" stanja (rail je uvek vidljiv, kao pre ove izmene). */
+@media (min-width: 1101px) {
+  .trigger {
+    display: none;
+  }
+
+  .overlay {
+    display: block;
+    position: static;
+    inset: auto;
+    z-index: auto;
+  }
+
+  .backdrop {
+    display: none;
+  }
+
+  .sheet {
+    position: static;
+    max-height: none;
+    border-radius: 0;
+    background: none;
+  }
+
+  .handle {
+    display: none;
+  }
+
+  .sheetBody {
+    overflow: visible;
+    padding: 0;
+  }
+
+  .sheetFooter {
+    display: none;
+  }
+}
