@@ -141,6 +141,8 @@ Pun tehnički opis: `apps/admin/README.md` (sekcija "Faza 2"). Opis na običnom 
 
 ## 9. Prihodni model (za kasniju CPC implementaciju)
 
+Objašnjenje ovog modela za same agencije (klijente), bez tehničkih detalja: [`docs/VODIC-ZA-AGENCIJE.md`](./VODIC-ZA-AGENCIJE.md) — ažurirati paralelno kad se ovde nešto promeni.
+
 - CPC fiksna cena po agenciji na startu (nema aukcije dok nema dovoljno oglašivača po istoj destinaciji) — okvirno 0.10-0.20€ po kliku u ranoj fazi.
 - Mesečni budžet-limit klikova po agenciji (sprečava nekontrolisan trošak).
 - `clicks` tabela beleži svaki klik na "Poseti agenciju" dugme, sa filtriranjem botova/duplikata (`is_valid` flag) pre fakturisanja.
