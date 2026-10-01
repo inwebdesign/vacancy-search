@@ -37,6 +37,12 @@
   border-color: var(--c-field-off);
 }
 
+.reset {
+  font: 600 12px var(--font-sans);
+  color: var(--c-link);
+  margin-left: 2px;
+}
+
 .sort {
   display: flex;
   gap: 6px;

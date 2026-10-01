@@ -119,7 +119,7 @@ export default async function PretragaPage({
             brojGostiju={params.brojGostiju}
             total={result.total}
           />
-          <ActiveFilterStrip chips={chips} />
+          <ActiveFilterStrip chips={chips} resetHref={resetHref} />
           {result.offers.length > 0 ? (
             <div className={styles.results}>
               {result.offers.map((offer) => (

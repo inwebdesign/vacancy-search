@@ -10,6 +10,7 @@ export interface FilterChip {
 
 export interface ActiveFilterStripProps {
   chips: FilterChip[];
+  resetHref: string;
 }
 
 const SORT_OPTIONS = [
@@ -21,7 +22,10 @@ const SORT_OPTIONS = [
 // Isti obrazac kao HighlightList: samo "Najniža cena" je stvarno sortiranje
 // (podrazumevano u searchOffers); ušteda/ocena nemaju podatke iza sebe
 // (grupisanje po jedinici, recenzije) — vidno prisutni, funkcionalno inertni.
-export function ActiveFilterStrip({ chips }: ActiveFilterStripProps) {
+// "Poništi sve" je i ovde (ne samo u FilterRail-u) jer je rail na mobilnom
+// sakriven iza bottom sheet-a (primedba 2026-10-01) — ova traka je jedino
+// mesto gde je resetovanje dostupno bez otvaranja sheet-a.
+export function ActiveFilterStrip({ chips, resetHref }: ActiveFilterStripProps) {
   return (
     <div className={styles.strip}>
       <div className={styles.chips}>
@@ -31,6 +35,11 @@ export function ActiveFilterStrip({ chips }: ActiveFilterStripProps) {
             {c.label} ✕
           </Link>
         ))}
+        {chips.length > 0 && (
+          <Link href={resetHref} className={styles.reset}>
+            Poništi sve
+          </Link>
+        )}
       </div>
       <div className={styles.sort}>
         <span className={styles.sortLabel}>Sortiraj:</span>
