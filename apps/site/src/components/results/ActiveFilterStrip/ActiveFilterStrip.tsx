@@ -23,27 +23,32 @@ const SORT_OPTIONS = [
 // (podrazumevano u searchOffers); ušteda/ocena nemaju podatke iza sebe
 // (grupisanje po jedinici, recenzije) — vidno prisutni, funkcionalno inertni.
 // "Poništi sve" je i ovde (ne samo u FilterRail-u) jer je rail na mobilnom
-// sakriven iza bottom sheet-a (primedba 2026-10-01) — ova traka je jedino
-// mesto gde je resetovanje dostupno bez otvaranja sheet-a.
+// sakriven iza bottom sheet-a (primedba 2026-10-01) — sopstveni red, desno
+// gore, IZNAD trake sa čipovima (isti raspored kao "Filter"/"Poništi sve"
+// zaglavlje u FilterRail-u na desktopu), ne zbijeno među čipove.
 export function ActiveFilterStrip({ chips, resetHref }: ActiveFilterStripProps) {
   return (
-    <div className={styles.strip}>
-      <div className={styles.chips}>
-        {chips.length > 0 && <span className={styles.label}>Izabrano</span>}
-        {chips.map((c) => (
-          <Link key={c.key} href={c.removeHref} className={styles.chip}>
-            {c.label} ✕
-          </Link>
-        ))}
-        {chips.length > 0 && (
+    <div>
+      {chips.length > 0 && (
+        <div className={styles.resetRow}>
           <Link href={resetHref} className={styles.reset}>
             Poništi sve
           </Link>
-        )}
-      </div>
-      <div className={styles.sort}>
-        <span className={styles.sortLabel}>Sortiraj:</span>
-        <SortChips options={SORT_OPTIONS} active="cena" />
+        </div>
+      )}
+      <div className={styles.strip}>
+        <div className={styles.chips}>
+          {chips.length > 0 && <span className={styles.label}>Izabrano</span>}
+          {chips.map((c) => (
+            <Link key={c.key} href={c.removeHref} className={styles.chip}>
+              {c.label} ✕
+            </Link>
+          ))}
+        </div>
+        <div className={styles.sort}>
+          <span className={styles.sortLabel}>Sortiraj:</span>
+          <SortChips options={SORT_OPTIONS} active="cena" />
+        </div>
       </div>
     </div>
   );

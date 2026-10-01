@@ -1,10 +1,16 @@
+.resetRow {
+  display: flex;
+  justify-content: flex-end;
+  margin: 14px 0 6px;
+}
+
 .strip {
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 10px;
-  margin: 14px 0 12px;
+  margin: 0 0 12px;
   padding: 10px 12px;
   background: var(--c-bg-cream);
   border: 1px solid #f0e6c4;
@@ -40,7 +46,6 @@
 .reset {
   font: 600 12px var(--font-sans);
   color: var(--c-link);
-  margin-left: 2px;
 }
 
 .sort {
